@@ -8,8 +8,8 @@ import { PageHeader } from "@/components/sections/page-header";
 import { useNews } from "@/lib/hooks/use-news";
 import { selectPublished } from "@/lib/newsService";
 
-// Client body of /berita: reads from localStorage, so it stays separate from
-// the server page.tsx that carries the route's metadata.
+// Client body of /berita: loads the articles from Supabase in the browser, so it
+// stays separate from the server page.tsx that carries the route's metadata.
 export function NewsList() {
   const articles = selectPublished(useNews());
   const latest = articles.slice(0, 3);

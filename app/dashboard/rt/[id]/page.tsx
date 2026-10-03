@@ -1,17 +1,28 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useParams, notFound } from "next/navigation";
 import Link from "next/link";
 import {
   Users, Home, Store, Sparkles, Newspaper, Map,
   Trash2, Plus, User, Phone, ArrowRight, Pencil,
 } from "lucide-react";
+import { AGE_GROUPS, sumUmur, totalWarga } from "@/lib/data/demografiData";
 import { getRTById, type RT } from "@/lib/data/wilayahData";
-import { getUMKMByRT, deleteUmkm, type UMKM } from "@/lib/umkmService";
-import { getPotensiByRT, addPotensiRT, updatePotensiRT, deletePotensiRT, type RTPotensi } from "@/lib/potensiService";
+import { selectUmkmByRT, deleteUmkm } from "@/lib/umkmService";
+import { selectPotensiByRT, addPotensiRT, updatePotensiRT, deletePotensiRT, type RTPotensi } from "@/lib/potensiService";
+import {
+  useDemografi,
+  useDemografiReady,
+  useWilayahHeads,
+  usePotensi,
+  usePotensiReady,
+  useUmkm,
+  useUmkmReady,
+} from "@/lib/hooks/use-directory";
 import { DonutChart } from "@/components/ui/donut-chart";
 import { BarChart } from "@/components/ui/bar-chart";
+import { DemografiForm } from "@/components/dashboard/demografi-form";
 import { AddPotensiModal } from "@/components/ui/add-potensi-modal";
 import { useAuth } from "@/components/providers/auth-provider";
 import { canManageWilayah } from "@/lib/auth";
@@ -37,21 +48,21 @@ export default function RTDetailPage() {
   const params = useParams();
   const rtId = params.id as string;
   const { user } = useAuth();
-  const [rt, setRt] = useState<RT | undefined>(undefined);
-  const [umkm, setUmkm] = useState<UMKM[]>([]);
-  const [potensi, setPotensi] = useState<RTPotensi[]>([]);
+  const rt: RT | undefined = getRTById(rtId);
+  const umkm = selectUmkmByRT(useUmkm(), rtId);
+  const potensi = selectPotensiByRT(usePotensi(), rtId);
   const [activeTab, setActiveTab] = useState<Tab>("ringkasan");
-  const [mounted, setMounted] = useState(false);
+  // Daftar UMKM dan potensi dimuat dari Supabase di browser.
+  const umkmReady = useUmkmReady();
+  const potensiReady = usePotensiReady();
+  const demografi = useDemografi().find((d) => d.rtId === rtId);
+  const demografiReady = useDemografiReady();
+  const { headOf, roleOf } = useWilayahHeads();
+  const mounted = umkmReady && potensiReady && demografiReady;
+  const [actionError, setActionError] = useState("");
 
   const [showAddPotensi, setShowAddPotensi] = useState(false);
   const [editingPotensi, setEditingPotensi] = useState<RTPotensi | null>(null);
-
-  useEffect(() => {
-    setRt(getRTById(rtId));
-    setUmkm(getUMKMByRT(rtId));
-    setPotensi(getPotensiByRT(rtId));
-    setMounted(true);
-  }, [rtId]);
 
   if (!mounted) {
     return (
@@ -65,28 +76,31 @@ export default function RTDetailPage() {
 
   const canManage = canManageWilayah(user, rtId);
 
-  function handleDeleteUMKM(id: string) {
+  async function handleDeleteUMKM(id: string) {
     if (!confirm("Hapus data UMKM ini?")) return;
+    setActionError("");
     try {
-      deleteUmkm(id);
+      await deleteUmkm(id);
     } catch (e) {
-      alert(e instanceof Error ? e.message : "UMKM gagal dihapus.");
+      setActionError(e instanceof Error ? e.message : "UMKM gagal dihapus.");
     }
-    setUmkm(getUMKMByRT(rtId));
   }
-  function handleAddPotensi(data: Omit<RTPotensi, "id" | "rtId">) {
-    addPotensiRT(rtId, data);
-    setPotensi(getPotensiByRT(rtId));
+  // Modal menampilkan error yang dilempar, jadi biarkan keduanya merambat.
+  async function handleAddPotensi(data: Omit<RTPotensi, "id" | "rtId">) {
+    await addPotensiRT(rtId, data);
   }
-  function handleEditPotensi(data: Omit<RTPotensi, "id" | "rtId">) {
+  async function handleEditPotensi(data: Omit<RTPotensi, "id" | "rtId">) {
     if (!editingPotensi) return;
-    updatePotensiRT(editingPotensi.id, data);
-    setPotensi(getPotensiByRT(rtId));
+    await updatePotensiRT(editingPotensi.id, data);
   }
-  function handleDeletePotensi(id: string) {
+  async function handleDeletePotensi(id: string) {
     if (!confirm("Hapus data potensi ini?")) return;
-    deletePotensiRT(id);
-    setPotensi(getPotensiByRT(rtId));
+    setActionError("");
+    try {
+      await deletePotensiRT(id);
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "Potensi gagal dihapus.");
+    }
   }
 
   return (
@@ -98,9 +112,9 @@ export default function RTDetailPage() {
 
         <div className="mt-3 flex flex-wrap gap-3">
           {[
-            { peran: "Ketua", nama: rt.ketua },
-            { peran: "Sekretaris", nama: rt.sekretaris ?? "–" },
-            { peran: "Bendahara", nama: rt.bendahara ?? "–" },
+            { peran: "Ketua", nama: headOf(rt.id)?.name ?? "Belum diisi" },
+            { peran: "Sekretaris", nama: roleOf(rt.id, "sekretaris")?.name ?? "–" },
+            { peran: "Bendahara", nama: roleOf(rt.id, "bendahara")?.name ?? "–" },
           ].map((p) => (
             <div key={p.peran} className="flex items-center gap-2 rounded-full border border-line bg-paper px-3 py-1.5">
               <User className="h-3.5 w-3.5 text-ink-400" />
@@ -111,11 +125,17 @@ export default function RTDetailPage() {
         </div>
       </div>
 
+      {actionError && (
+        <p role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {actionError}
+        </p>
+      )}
+
       {/* ── Quick-stat cards ── */}
       <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
-          { label: "Total Warga", value: `${rt.jumlahWarga} jiwa`, color: "bg-brand-50 text-brand-700", icon: Users },
-          { label: "Kepala Keluarga", value: `${rt.jumlahKK} KK`, color: "bg-teal-50 text-teal-700", icon: Home },
+          { label: "Total Warga", value: demografi ? `${totalWarga(demografi)} jiwa` : "–", color: "bg-brand-50 text-brand-700", icon: Users },
+          { label: "Kepala Keluarga", value: demografi ? `${demografi.jumlahKK} KK` : "–", color: "bg-teal-50 text-teal-700", icon: Home },
           { label: "Jumlah UMKM", value: `${umkm.length} usaha`, color: "bg-amber-50 text-amber-700", icon: Store },
           { label: "Potensi RT", value: `${potensi.length} data`, color: "bg-purple-50 text-purple-700", icon: Sparkles },
         ].map((s) => (
@@ -156,28 +176,38 @@ export default function RTDetailPage() {
           <div className="grid gap-6 sm:grid-cols-2">
             <div className="rounded-2xl border border-line bg-paper p-6 shadow-sm">
               <h2 className="mb-4 font-display text-sm font-semibold text-ink-900">Komposisi Gender</h2>
-              <DonutChart
-                size={160}
-                strokeWidth={30}
-                centerLabel="warga"
-                centerValue={rt.jumlahWarga}
-                segments={[
-                  { label: "Laki-laki", value: rt.jumlahLaki, color: "#0891b2" },
-                  { label: "Perempuan", value: rt.jumlahPerempuan, color: "#ec4899" },
-                ]}
-              />
+              {demografi && totalWarga(demografi) > 0 ? (
+                <DonutChart
+                  size={160}
+                  strokeWidth={30}
+                  centerLabel="warga"
+                  centerValue={totalWarga(demografi)}
+                  segments={[
+                    { label: "Laki-laki", value: demografi.laki, color: "#0891b2" },
+                    { label: "Perempuan", value: demografi.perempuan, color: "#ec4899" },
+                  ]}
+                />
+              ) : (
+                <p className="text-sm text-ink-500">Data kependudukan belum diisi.</p>
+              )}
             </div>
 
             <div className="rounded-2xl border border-line bg-paper p-6 shadow-sm">
               <h2 className="mb-5 font-display text-sm font-semibold text-ink-900">Piramida Usia</h2>
-              <BarChart
-                bars={rt.kelompokUmur.map((g) => ({ label: g.label, value: g.jumlah }))}
-                height={160}
-                barColor="#16a34a"
-                unit=" jiwa"
-              />
+              {demografi && sumUmur(demografi.kelompokUmur) > 0 ? (
+                <BarChart
+                  bars={AGE_GROUPS.map((label, i) => ({ label, value: demografi.kelompokUmur[i] }))}
+                  height={160}
+                  barColor="#16a34a"
+                  unit=" jiwa"
+                />
+              ) : (
+                <p className="text-sm text-ink-500">Data kelompok usia belum diisi.</p>
+              )}
             </div>
           </div>
+
+          {canManage && <DemografiForm key={rtId} rtId={rtId} rtLabel={rt.label} initial={demografi} />}
 
           {/* Quick links to other features */}
           <div className="grid gap-3 sm:grid-cols-2">

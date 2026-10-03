@@ -8,7 +8,7 @@ export function BarStat({
   return (
     <div className="space-y-4">
       {data.map((row) => {
-        const pct = Math.round((row.value / total) * 100);
+        const pct = total > 0 ? Math.round((row.value / total) * 100) : 0;
         return (
           <div key={row.group}>
             <div className="mb-1.5 flex items-baseline justify-between text-sm">

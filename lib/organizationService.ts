@@ -1,22 +1,29 @@
 import { AccessError, requireSession, requireWilayah } from "./access";
 import { canManageWilayah, type SessionUser } from "./auth";
-import { createLocalStore } from "./localStore";
 import {
   MAX_ORGANIZATION_GALLERY,
   organizationFields,
-  organizationSeed,
   type Organization,
   type OrganizationMember,
 } from "./data/organizationData";
 import { getWilayahLevel } from "./data/wilayahData";
+import { rowToOrganization } from "./db/mappers";
+import { toUserError } from "./db/errors";
+import { saveWithUniqueSlug } from "./db/slug";
 import { validateLocation } from "./geo";
+import { droppedMedia, removeMedia } from "./image-upload";
 import { safeExternalUrl } from "./links";
+import { createRemoteStore } from "./remoteStore";
+import { getSupabase } from "./supabase/client";
 import { slugify } from "./utils";
 
-export const organizationStore = createLocalStore<Organization>({
-  key: "cilikan_organizations_v1",
-  seed: organizationSeed,
-});
+async function loadOrganizations(): Promise<Organization[]> {
+  const { data, error } = await getSupabase().from("organizations").select("*").order("name", { ascending: true });
+  if (error) throw toUserError(error, "Data organisasi gagal dimuat.");
+  return (data ?? []).map(rowToOrganization);
+}
+
+export const organizationStore = createRemoteStore<Organization>({ load: loadOrganizations });
 
 export type OrganizationMemberInput = Pick<OrganizationMember, "name" | "position">;
 
@@ -61,18 +68,17 @@ export function findOrganizationById(all: Organization[], id: string): Organizat
 
 // --- mutations -------------------------------------------------------------
 
-function uniqueSlug(base: string, all: Organization[], excludeId?: string): string {
+function guessSlug(base: string, all: Organization[], excludeId?: string): { guess: string; root: string } {
   const root = slugify(base) || "organisasi";
   const taken = new Set(all.filter((o) => o.id !== excludeId).map((o) => o.slug));
-  if (!taken.has(root)) return root;
-  let n = 2;
-  while (taken.has(`${root}-${n}`)) n += 1;
-  return `${root}-${n}`;
+  let guess = root;
+  for (let n = 2; taken.has(guess); n += 1) guess = `${root}-${n}`;
+  return { guess, root };
 }
 
-function clean(value?: string): string | undefined {
+function clean(value?: string): string | null {
   const v = value?.trim();
-  return v || undefined;
+  return v || null;
 }
 
 function validate(input: OrganizationInput): void {
@@ -119,51 +125,53 @@ function buildMembers(members: OrganizationMemberInput[] | undefined, existing: 
   }));
 }
 
-function buildFields(input: OrganizationInput, all: Organization[], excludeId?: string) {
+function toRow(input: OrganizationInput, slug: string, existingMembers: OrganizationMember[] = []) {
   return {
+    slug,
     name: input.name.trim(),
-    slug: uniqueSlug(input.slug || input.name, all, excludeId),
-    logo: input.logo,
+    logo: input.logo ?? null,
     summary: input.summary.trim(),
     description: input.description.map((p) => p.trim()).filter(Boolean),
-    fieldId: input.fieldId,
-    wilayahId: input.wilayahId,
-    foundedYear: input.foundedYear,
+    field_id: input.fieldId,
+    wilayah_id: input.wilayahId,
+    founded_year: input.foundedYear ?? null,
     leader: clean(input.leader),
     contact: clean(input.contact),
     alamat: clean(input.alamat),
-    mapsUrl: clean(input.mapsUrl),
-    lat: input.lat,
-    lng: input.lng,
+    maps_url: clean(input.mapsUrl),
+    lat: input.lat ?? null,
+    lng: input.lng ?? null,
     instagram: clean(input.instagram),
     facebook: clean(input.facebook),
     website: clean(input.website),
     gallery: input.gallery,
+    members: buildMembers(input.members, existingMembers) ?? [],
   };
 }
 
-export function createOrganization(input: OrganizationInput): Organization {
+export async function createOrganization(input: OrganizationInput): Promise<Organization> {
   const session = requireSession();
   requireWilayah(session, input.wilayahId);
   validate(input);
 
-  const all = organizationStore.getSnapshot();
-  const now = new Date().toISOString();
-  const org: Organization = {
-    ...buildFields(input, all),
-    members: buildMembers(input.members),
-    id: `org-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
-    createdBy: session.username,
-    createdAt: now,
-    updatedAt: now,
-  };
-  organizationStore.write([...all, org]);
-  return org;
+  const supabase = getSupabase();
+  const { guess, root } = guessSlug(input.slug || input.name, organizationStore.getState().items);
+  const { data, error } = await saveWithUniqueSlug(guess, root, (slug) =>
+    supabase
+      .from("organizations")
+      .insert({ ...toRow(input, slug), created_by: session.userId })
+      .select("*")
+      .single()
+  );
+  if (error || !data) throw toUserError(error ?? { message: "no data" }, "Organisasi gagal disimpan.");
+
+  await organizationStore.refresh();
+  return rowToOrganization(data);
 }
 
-export function updateOrganization(id: string, input: OrganizationInput): Organization {
+export async function updateOrganization(id: string, input: OrganizationInput): Promise<Organization> {
   const session = requireSession();
-  const all = organizationStore.getSnapshot();
+  const all = organizationStore.getState().items;
   const existing = findOrganizationById(all, id);
   if (!existing) throw new Error("Organisasi tidak ditemukan.");
   // Both ends are checked: the account must own the current wilayah and the
@@ -172,23 +180,36 @@ export function updateOrganization(id: string, input: OrganizationInput): Organi
   requireWilayah(session, input.wilayahId);
   validate(input);
 
-  const updated: Organization = {
-    ...existing,
-    ...buildFields(input, all, id),
-    members: buildMembers(input.members, existing.members),
-    updatedAt: new Date().toISOString(),
-  };
-  organizationStore.write(all.map((o) => (o.id === id ? updated : o)));
-  return updated;
+  const supabase = getSupabase();
+  const { guess, root } = guessSlug(input.slug || input.name, all, id);
+  const { data, error } = await saveWithUniqueSlug(guess, root, (slug) =>
+    supabase
+      .from("organizations")
+      .update(toRow(input, slug, existing.members))
+      .eq("id", id)
+      .select("*")
+      .maybeSingle()
+  );
+  if (error) throw toUserError(error, "Organisasi gagal disimpan.");
+  if (!data) throw new AccessError();
+
+  await removeMedia(droppedMedia([existing.logo, ...existing.gallery], [input.logo, ...input.gallery]));
+  await organizationStore.refresh();
+  return rowToOrganization(data);
 }
 
-export function deleteOrganization(id: string): void {
+export async function deleteOrganization(id: string): Promise<void> {
   const session = requireSession();
-  const all = organizationStore.getSnapshot();
-  const existing = findOrganizationById(all, id);
+  const existing = findOrganizationById(organizationStore.getState().items, id);
   if (!existing) return;
   if (!canManageOrganization(session, existing)) throw new AccessError();
-  organizationStore.write(all.filter((o) => o.id !== id));
+
+  const { data, error } = await getSupabase().from("organizations").delete().eq("id", id).select("id");
+  if (error) throw toUserError(error, "Organisasi gagal dihapus.");
+  if (!data || data.length === 0) throw new AccessError();
+
+  await removeMedia([existing.logo, ...existing.gallery]);
+  await organizationStore.refresh();
 }
 
 export type { Organization, OrganizationMember };

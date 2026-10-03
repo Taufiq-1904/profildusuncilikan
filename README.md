@@ -41,16 +41,17 @@ Wilayah didefinisikan relasional di `lib/data/wilayahData.ts` (`rwList`, `rtList
 
 Struktur kepengurusan organisasi bersifat **opsional**: organisasi boleh hanya berupa profil. Bagan struktur dusun bersifat data-driven (baris = `tier`, urutan = `order`), tanpa data yang ditulis langsung di komponen.
 
-### Penyimpanan data saat ini
+### Penyimpanan data
 
-Belum ada database. Berita, organisasi, UMKM, dan struktur dusun disimpan di `localStorage` browser lewat `lib/localStore.ts`, dan seed awal berasal dari `lib/data/*`. Konsekuensinya:
+Semua data tersimpan di **Supabase** (Postgres + Auth + Storage); tidak ada yang disimpan di `localStorage`.
 
-- Data yang diinput dari dashboard hanya terlihat di browser yang sama.
-- Otorisasi berjalan di sisi klien; ini belum menjadi pengaman sesungguhnya. Backend nyata (auth dengan password ter-hash + database) tetap diperlukan sebelum peluncuran publik.
-- `generateMetadata` dan sitemap hanya mengenal data seed; halaman detail data buatan browser mengatur judul tab di klien.
-- Data UMKM lama (kunci `cilikan_umkm`) otomatis dimigrasi saat dibaca (`normalizeUmkm`).
-
-Semua akses data melewati service dan store, sehingga migrasi ke Supabase nanti cukup mengganti isi `localStore`/service tanpa mengubah UI.
+- Skema, RLS, dan fungsi: `supabase/schema.sql`. Data contoh: `supabase/seed.sql`. Langkah setup: `MIGRASI.md`.
+- Browser membaca/menulis lewat `lib/*Service.ts` yang memakai `lib/supabase/client.ts`. Daftar dimuat sekali dan di-cache di memori oleh `lib/remoteStore.ts`, lalu dimuat ulang setelah setiap tambah/ubah/hapus atau login/logout.
+- Login memakai Supabase Auth (username dipetakan ke email oleh fungsi `login_email`). Sesi disegarkan oleh `proxy.ts`.
+- Hak akses sebenarnya dijaga Row Level Security di database; pemeriksaan di `lib/auth.ts` hanya untuk UI dan pesan error.
+- Gambar diunggah ke bucket `media` (`lib/image-upload.ts`); tabel hanya menyimpan URL-nya.
+- Metadata SEO, JSON-LD, dan sitemap dibaca di server lewat `lib/server/public-content.ts` (hanya konten publik).
+- Reset password akun lain memakai `app/api/admin/reset-password/route.ts` dan `SUPABASE_SERVICE_ROLE_KEY` (server saja).
 
 
 ### Peta (Phase 4)

@@ -9,7 +9,7 @@ import { buildMetadata } from "@/lib/seo";
 
 export const metadata = buildMetadata({
   title: "Struktur Organisasi",
-  description: "Bagan kepengurusan dusun: kepala dusun, pengurus RW, dan ketua RT.",
+  description: "Bagan kepengurusan Dusun Cilikan: pengurus dusun, tiap RW, dan tiap RT.",
   path: "/profil/struktur",
 });
 
@@ -22,7 +22,7 @@ export default function StrukturOrganisasiPage() {
         description="Susunan pengurus yang melayani warga, dari kepala dusun hingga ketua RT."
       />
       <Breadcrumb items={[{ label: "Profil", href: "/profil" }, { label: "Struktur Organisasi" }]} />
-      <RoleManageBar roles={["dusun"]} href="/dashboard/struktur" label="Edit struktur dusun" />
+      <RoleManageBar roles={["dusun", "rw", "rt"]} href="/dashboard/struktur" label="Edit struktur" />
 
       <section className="py-16 sm:py-20" aria-label="Bagan struktur organisasi">
         <Container>

@@ -13,7 +13,7 @@ import { PlaceMapView } from "./place-map-view";
 // Public map. `compact` is the homepage preview: a legend and the map, no
 // search or list. The full version adds kind filters, search and a list.
 export function MapExplorer({ compact = false }: { compact?: boolean }) {
-  const places = useMapPlaces();
+  const { places } = useMapPlaces();
   const [hidden, setHidden] = useState<ReadonlySet<PlaceKind>>(new Set());
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);

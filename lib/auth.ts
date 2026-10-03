@@ -1,4 +1,5 @@
-import { accounts as seedAccounts, type AppUser, type Role } from "./data/authData";
+import { getSupabase } from "./supabase/client";
+import { markAuthReady, refreshAllStores } from "./remoteStore";
 import {
   dusun,
   getRTById,
@@ -10,13 +11,12 @@ import {
   type WilayahLevel,
 } from "./data/wilayahData";
 
-const SESSION_KEY = "cilikan_auth";
-const CREDENTIALS_KEY = "cilikan_credentials";
-const AUTH_EVENT = "cilikan:auth";
+export type Role = "dusun" | "rw" | "rt";
 
 export type SessionUser = {
-  // Stable id of the account (the username it was created with). It never
-  // changes, even when the login username is changed later.
+  // id akun di Supabase Auth (auth.users.id).
+  userId: string;
+  // Sama dengan userId. Dipertahankan agar kode lama yang memakai accountId tetap jalan.
   accountId: string;
   username: string;
   displayName: string;
@@ -24,241 +24,201 @@ export type SessionUser = {
   wilayahId: string;
 };
 
-// --- safe browser storage ---------------------------------------------------
-// localStorage can throw (private mode, blocked cookies, quota full because
-// of stored images). Login must not depend on it succeeding, so every access
-// is guarded and the session falls back to sessionStorage and then memory.
+// --- keadaan sesi -----------------------------------------------------------
+// Sesi sebenarnya dikelola Supabase Auth (cookie). Di sini hanya salinan di
+// memori supaya komponen bisa membacanya secara sinkron. Hak akses yang
+// mengikat tetap dijaga Row Level Security di database, bukan oleh kode ini.
 
-let memorySession: string | null = null;
+const AUTH_EVENT = "cilikan:auth";
 
-function storage(kind: "local" | "session"): Storage | null {
-  if (typeof window === "undefined") return null;
-  try {
-    return kind === "local" ? window.localStorage : window.sessionStorage;
-  } catch {
-    return null;
-  }
-}
+let current: SessionUser | null = null;
+let started: Promise<void> | null = null;
 
-function readItem(key: string): string | null {
-  for (const kind of ["local", "session"] as const) {
-    try {
-      const value = storage(kind)?.getItem(key);
-      if (value) return value;
-    } catch {
-      // try the next storage
-    }
-  }
-  return null;
-}
-
-function writeItem(key: string, value: string): boolean {
-  for (const kind of ["local", "session"] as const) {
-    try {
-      const store = storage(kind);
-      if (!store) continue;
-      store.setItem(key, value);
-      return true;
-    } catch {
-      // quota exceeded or blocked: try the next storage
-    }
-  }
-  return false;
-}
-
-function removeItem(key: string): void {
-  for (const kind of ["local", "session"] as const) {
-    try {
-      storage(kind)?.removeItem(key);
-    } catch {
-      // ignore
-    }
-  }
-}
-
-function notifyAuthChanged(): void {
+function notify(): void {
   if (typeof window !== "undefined") window.dispatchEvent(new Event(AUTH_EVENT));
 }
 
 export function subscribeAuth(onChange: () => void): () => void {
   window.addEventListener(AUTH_EVENT, onChange);
-  window.addEventListener("storage", onChange);
-  return () => {
-    window.removeEventListener(AUTH_EVENT, onChange);
-    window.removeEventListener("storage", onChange);
+  return () => window.removeEventListener(AUTH_EVENT, onChange);
+}
+
+export function getSession(): SessionUser | null {
+  return current;
+}
+
+async function fetchProfile(userId: string): Promise<SessionUser | null> {
+  const { data, error } = await getSupabase()
+    .from("profiles")
+    .select("id, username, display_name, role, wilayah_id")
+    .eq("id", userId)
+    .maybeSingle();
+  if (error || !data) {
+    if (error) console.error("Gagal memuat profil pengelola:", error);
+    return null;
+  }
+  return {
+    userId: data.id,
+    accountId: data.id,
+    username: data.username ?? "",
+    displayName: data.display_name,
+    role: data.role as Role,
+    wilayahId: data.wilayah_id,
   };
 }
 
-// --- accounts (seed + credential overrides) ---------------------------------
-// Credentials changed from the dashboard are kept as overrides on top of the
-// seed accounts. Overrides live in this browser only.
+async function syncSession(userId: string | null, force = false): Promise<void> {
+  if (!userId) {
+    if (current === null) return;
+    current = null;
+  } else {
+    if (!force && current?.userId === userId) return;
+    current = await fetchProfile(userId);
+  }
+  notify();
+  // Isi tiap daftar berbeda untuk tiap sesi (draft, UMKM nonaktif).
+  refreshAllStores();
+}
 
-type CredentialOverride = { username?: string; password?: string };
-type OverrideMap = Record<string, CredentialOverride>;
+// Dipanggil sekali oleh AuthProvider. Memulihkan sesi dari cookie, lalu
+// mengikuti perubahan (login, logout, token diperbarui, tab lain).
+export function initAuth(): Promise<void> {
+  if (started) return started;
+  started = (async () => {
+    try {
+      const supabase = getSupabase();
+      const { data } = await supabase.auth.getSession();
+      const userId = data.session?.user.id ?? null;
+      if (userId) current = await fetchProfile(userId);
+      notify();
 
-export type Account = AppUser & { id: string };
-
-function readOverrides(): OverrideMap {
-  const raw = readItem(CREDENTIALS_KEY);
-  if (!raw) return {};
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
-    const clean: OverrideMap = {};
-    for (const [id, value] of Object.entries(parsed as Record<string, unknown>)) {
-      if (!value || typeof value !== "object") continue;
-      const v = value as CredentialOverride;
-      clean[id] = {
-        username: typeof v.username === "string" && v.username ? v.username : undefined,
-        password: typeof v.password === "string" && v.password ? v.password : undefined,
-      };
+      supabase.auth.onAuthStateChange((_event, session) => {
+        // Jangan memanggil Supabase langsung di dalam callback ini (bisa
+        // saling mengunci); tunda ke tick berikutnya.
+        setTimeout(() => void syncSession(session?.user.id ?? null), 0);
+      });
+    } catch (e) {
+      console.error("Gagal memulihkan sesi:", e);
+    } finally {
+      markAuthReady();
     }
-    return clean;
-  } catch {
-    return {};
-  }
+  })();
+  return started;
 }
 
-function saveOverride(id: string, patch: CredentialOverride): void {
-  const all = readOverrides();
-  all[id] = { ...all[id], ...patch };
-  // Credentials must really persist, otherwise the user would believe the
-  // password changed when it did not.
-  let stored = false;
-  try {
-    storage("local")?.setItem(CREDENTIALS_KEY, JSON.stringify(all));
-    stored = storage("local") !== null;
-  } catch {
-    stored = false;
-  }
-  if (!stored) {
-    throw new Error(
-      "Perubahan tidak dapat disimpan karena penyimpanan browser penuh atau diblokir. Hapus data lama lalu coba lagi."
-    );
-  }
-  notifyAuthChanged();
-}
-
-export function getAccounts(): Account[] {
-  const overrides = readOverrides();
-  return seedAccounts.map((seed) => {
-    const o = overrides[seed.username];
-    return {
-      ...seed,
-      id: seed.username,
-      username: o?.username ?? seed.username,
-      password: o?.password ?? seed.password,
-    };
-  });
-}
+// --- login / logout ---------------------------------------------------------
 
 function normalizeUsername(value: string): string {
   return value.trim().toLowerCase();
 }
 
-// Phones often add a trailing space (autocomplete/suggestions). Passwords set
-// from the dashboard never have surrounding spaces, so tolerating them on
-// input is safe.
-function passwordMatches(stored: string, input: string): boolean {
-  if (input === stored) return true;
-  return stored === stored.trim() && input.trim() === stored;
+async function resolveEmail(identifier: string): Promise<string | null> {
+  const value = identifier.trim();
+  if (value.includes("@")) return value;
+  const { data, error } = await getSupabase().rpc("login_email", { p_username: value });
+  if (error) throw new Error("Login gagal diproses. Coba lagi sebentar lagi.");
+  return typeof data === "string" && data ? data : null;
 }
 
-function toSession(account: Account): SessionUser {
-  return {
-    accountId: account.id,
-    username: account.username,
-    displayName: account.displayName,
-    role: account.role,
-    wilayahId: account.wilayahId,
-  };
+async function signInWith(email: string, password: string): Promise<boolean> {
+  const { error } = await getSupabase().auth.signInWithPassword({ email, password });
+  if (!error) return true;
+  // Kredensial salah bukan kesalahan sistem; sisanya dilempar ke pemanggil.
+  if (error.status === 400 || /invalid login credentials/i.test(error.message)) return false;
+  throw new Error("Login gagal diproses. Coba lagi sebentar lagi.");
 }
 
-export function login(username: string, password: string): SessionUser | null {
-  const wanted = normalizeUsername(username);
-  const account = getAccounts().find((a) => normalizeUsername(a.username) === wanted);
-  if (!account || !passwordMatches(account.password, password)) return null;
+// Mengembalikan null bila username/password salah.
+export async function login(identifier: string, password: string): Promise<SessionUser | null> {
+  const email = await resolveEmail(identifier);
+  if (!email) return null;
 
-  const payload = JSON.stringify({ accountId: account.id, username: account.username });
-  memorySession = payload;
-  writeItem(SESSION_KEY, payload);
-  return toSession(account);
-}
+  let ok = await signInWith(email, password);
+  // HP sering menambahkan spasi di akhir lewat autocomplete. Password yang
+  // dibuat lewat dashboard tidak pernah berspasi di tepi, jadi aman dicoba ulang.
+  if (!ok && password !== password.trim()) ok = await signInWith(email, password.trim());
+  if (!ok) return null;
 
-export function logout(): void {
-  memorySession = null;
-  removeItem(SESSION_KEY);
-}
+  const { data } = await getSupabase().auth.getUser();
+  if (!data.user) return null;
+  await syncSession(data.user.id, true);
 
-export function getSession(): SessionUser | null {
-  if (typeof window === "undefined") return null;
-  const raw = readItem(SESSION_KEY) ?? memorySession;
-  if (!raw) return null;
-  try {
-    const stored = JSON.parse(raw) as { accountId?: string; username?: string };
-    // Only the account id is trusted from storage. Role and wilayah are
-    // looked up again from the account list, so editing storage by hand
-    // cannot turn an RT account into a dusun account. Sessions saved by an
-    // older version only have the username, which equalled the id then.
-    const key = stored.accountId ?? stored.username;
-    const account = getAccounts().find((a) => a.id === key);
-    return account ? toSession(account) : null;
-  } catch {
-    return null;
+  if (!current) {
+    // Akun ada di Supabase Auth tetapi belum didaftarkan sebagai pengelola.
+    await getSupabase().auth.signOut();
+    throw new Error("Akun ini belum terdaftar sebagai pengelola. Hubungi admin dusun.");
   }
+  return current;
 }
 
-// --- changing credentials ---------------------------------------------------
+export async function logout(): Promise<void> {
+  await getSupabase().auth.signOut();
+  await syncSession(null);
+}
+
+// --- mengubah kredensial ----------------------------------------------------
 
 export const MIN_PASSWORD_LENGTH = 8;
 
-function validateNewPassword(next: string, account: Account, seedPassword: string): void {
+function requireCurrent(): SessionUser {
+  if (!current) throw new Error("Sesi login tidak ditemukan. Silakan masuk kembali.");
+  return current;
+}
+
+function validateNewPassword(next: string, username: string): void {
   if (next.length < MIN_PASSWORD_LENGTH) {
     throw new Error(`Password baru minimal ${MIN_PASSWORD_LENGTH} karakter.`);
   }
   if (next !== next.trim()) {
     throw new Error("Password tidak boleh diawali atau diakhiri spasi.");
   }
-  if (normalizeUsername(next) === normalizeUsername(account.username)) {
+  if (normalizeUsername(next) === normalizeUsername(username)) {
     throw new Error("Password tidak boleh sama dengan username.");
   }
-  if (next === seedPassword) {
-    throw new Error("Pilih password yang berbeda dari password bawaan.");
+}
+
+// Memastikan yang mengetik memang pemilik akun, dengan login ulang memakai
+// password saat ini. Sesi yang sedang berjalan tidak terganggu.
+async function verifyCurrentPassword(password: string): Promise<void> {
+  const supabase = getSupabase();
+  const { data } = await supabase.auth.getUser();
+  const email = data.user?.email;
+  if (!email) throw new Error("Sesi login tidak ditemukan. Silakan masuk kembali.");
+  const ok = await signInWith(email, password);
+  if (!ok) throw new Error("Password saat ini salah.");
+}
+
+export async function changeOwnPassword(currentPassword: string, next: string, confirm: string): Promise<void> {
+  const me = requireCurrent();
+  if (next !== confirm) throw new Error("Konfirmasi password tidak sama dengan password baru.");
+  if (next === currentPassword) throw new Error("Password baru harus berbeda dari yang sekarang.");
+  validateNewPassword(next, me.username);
+  await verifyCurrentPassword(currentPassword);
+
+  const { error } = await getSupabase().auth.updateUser({ password: next });
+  if (error) {
+    console.error(error);
+    throw new Error(error.message || "Password gagal diubah.");
   }
 }
 
-function seedPasswordOf(id: string): string {
-  return seedAccounts.find((a) => a.username === id)?.password ?? "";
-}
-
-function requireCurrentAccount(): { session: SessionUser; account: Account } {
-  const session = getSession();
-  if (!session) throw new Error("Sesi login tidak ditemukan. Silakan masuk kembali.");
-  const account = getAccounts().find((a) => a.id === session.accountId);
-  if (!account) throw new Error("Akun tidak ditemukan.");
-  return { session, account };
-}
-
-export function changeOwnPassword(current: string, next: string, confirm: string): void {
-  const { account } = requireCurrentAccount();
-  if (!passwordMatches(account.password, current)) throw new Error("Password saat ini salah.");
-  if (next !== confirm) throw new Error("Konfirmasi password tidak sama dengan password baru.");
-  if (next === account.password) throw new Error("Password baru harus berbeda dari yang sekarang.");
-  validateNewPassword(next, account, seedPasswordOf(account.id));
-  saveOverride(account.id, { password: next });
-}
-
-export function changeOwnUsername(newUsername: string, currentPassword: string): void {
-  const { account } = requireCurrentAccount();
-  if (!passwordMatches(account.password, currentPassword)) throw new Error("Password saat ini salah.");
+export async function changeOwnUsername(newUsername: string, currentPassword: string): Promise<void> {
+  const me = requireCurrent();
   const next = normalizeUsername(newUsername);
   if (!/^[a-z0-9._-]{3,30}$/.test(next)) {
     throw new Error("Username 3–30 karakter, hanya huruf kecil, angka, titik, garis bawah, atau tanda hubung.");
   }
-  if (next === normalizeUsername(account.username)) throw new Error("Username baru sama dengan yang sekarang.");
-  const taken = getAccounts().some((a) => a.id !== account.id && normalizeUsername(a.username) === next);
-  if (taken) throw new Error("Username sudah dipakai akun lain.");
-  saveOverride(account.id, { username: next });
+  if (next === normalizeUsername(me.username)) throw new Error("Username baru sama dengan yang sekarang.");
+  await verifyCurrentPassword(currentPassword);
+
+  const { error } = await getSupabase().rpc("change_my_username", { p_username: next });
+  if (error) {
+    if (error.code === "23505") throw new Error("Username sudah dipakai akun lain.");
+    console.error(error);
+    throw new Error("Username gagal diubah.");
+  }
+  current = { ...me, username: next };
+  notify();
 }
 
 export type ManagedAccount = {
@@ -267,39 +227,59 @@ export type ManagedAccount = {
   displayName: string;
   role: Role;
   wilayahId: string;
-  passwordChanged: boolean;
 };
 
-// Only the dusun account can see and reset the others.
-export function listManagedAccounts(session: SessionUser | null): ManagedAccount[] {
+// Hanya akun Dusun yang boleh melihat dan mengatur ulang akun lain
+// (dijaga oleh policy profiles_read_own di database).
+export async function listManagedAccounts(session: SessionUser | null): Promise<ManagedAccount[]> {
   if (session?.role !== "dusun") return [];
-  const overrides = readOverrides();
-  return getAccounts().map((a) => ({
-    id: a.id,
-    username: a.username,
-    displayName: a.displayName,
-    role: a.role,
-    wilayahId: a.wilayahId,
-    passwordChanged: Boolean(overrides[a.id]?.password),
-  }));
+  const { data, error } = await getSupabase()
+    .from("profiles")
+    .select("id, username, display_name, role, wilayah_id")
+    .neq("id", session.userId);
+  if (error) {
+    console.error(error);
+    throw new Error("Daftar akun gagal dimuat.");
+  }
+  const order = { rw: 0, rt: 1, dusun: 2 } as const;
+  return (data ?? [])
+    .map((p) => ({
+      id: p.id as string,
+      username: (p.username as string | null) ?? "",
+      displayName: p.display_name as string,
+      role: p.role as Role,
+      wilayahId: p.wilayah_id as string,
+    }))
+    .sort((a, b) => order[a.role] - order[b.role] || a.wilayahId.localeCompare(b.wilayahId));
 }
 
-export function resetAccountPassword(targetId: string, next: string): void {
-  const { session } = requireCurrentAccount();
-  if (session.role !== "dusun") throw new Error("Hanya akun Dusun yang dapat mengatur ulang password akun lain.");
-  const target = getAccounts().find((a) => a.id === targetId);
-  if (!target) throw new Error("Akun tujuan tidak ditemukan.");
-  validateNewPassword(next, target, seedPasswordOf(target.id));
-  saveOverride(target.id, { password: next });
+// Mengatur ulang password akun lain butuh hak admin Supabase, yang tidak boleh
+// ada di browser. Karena itu lewat Route Handler di server.
+export async function resetAccountPassword(targetId: string, next: string): Promise<void> {
+  const me = requireCurrent();
+  if (me.role !== "dusun") throw new Error("Hanya akun Dusun yang dapat mengatur ulang password akun lain.");
+  validateNewPassword(next, "");
+
+  const res = await fetch("/api/admin/reset-password", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userId: targetId, password: next }),
+  });
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(body?.error ?? "Password gagal diatur ulang.");
+  }
 }
+
+// --- hak akses --------------------------------------------------------------
 
 export function isDusun(session: SessionUser | null): boolean {
   return session?.role === "dusun";
 }
 
-// Authorization is resolved relationally through the wilayah hierarchy
-// (dusun > rw > rt) rather than hardcoded id comparisons, so adding more
-// RW/RT later needs no logic changes here.
+// Padanan di sisi UI untuk fungsi can_manage_wilayah() di database. Ini hanya
+// untuk menyembunyikan tombol dan memberi pesan yang ramah; yang benar-benar
+// mengikat adalah Row Level Security.
 export function canManageWilayah(session: SessionUser | null, targetWilayahId: string): boolean {
   if (!session) return false;
   if (session.role === "dusun") return true;
@@ -325,8 +305,8 @@ function toManageable(id: string): ManageableWilayah | null {
   return level ? { id, label: getWilayahLabel(id), level } : null;
 }
 
-// Every wilayah this session may publish or manage content for, in
-// hierarchy order (dusun, then each RW followed by its RTs).
+// Setiap wilayah yang boleh dipublikasi/dikelola sesi ini, berurutan menurut
+// hierarki (dusun, lalu tiap RW diikuti RT-nya).
 export function getManageableWilayah(session: SessionUser | null): ManageableWilayah[] {
   if (!session) return [];
   let ids: string[] = [];
@@ -339,5 +319,3 @@ export function getManageableWilayah(session: SessionUser | null): ManageableWil
   }
   return ids.map(toManageable).filter((w): w is ManageableWilayah => w !== null);
 }
-
-export { type AppUser };

@@ -1,7 +1,6 @@
 import { ImagePlaceholder } from "@/components/ui/image-placeholder";
-import type { Official } from "@/lib/data/officialsData";
 
-export function OfficialCard({ official }: { official: Official }) {
+export function OfficialCard({ official }: { official: { name: string; position: string } }) {
   return (
     <div className="group text-center">
       <ImagePlaceholder

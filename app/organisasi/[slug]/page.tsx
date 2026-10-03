@@ -1,25 +1,23 @@
 import type { Metadata } from "next";
 import { OrganizationDetail } from "@/components/sections/organization-detail";
 import { JsonLd } from "@/components/seo/json-ld";
-import { organizationSeed } from "@/lib/data/organizationData";
 import { getWilayahLabel } from "@/lib/data/wilayahData";
 import { buildMetadata } from "@/lib/seo";
+import { getOrganizationBySlug } from "@/lib/server/public-content";
 
 type Props = { params: Promise<{ slug: string }> };
 
-// The server can only see the seed organizations. Ones added from the
-// dashboard live in the browser until there is a database, so they fall back
-// to the generic title (the page sets the real tab title once it loads).
+// Metadata dan JSON-LD dibaca dari Supabase di server.
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
-  const org = organizationSeed.find((o) => o.slug === slug);
+  const org = await getOrganizationBySlug(slug);
   if (!org) return { title: "Organisasi & Komunitas" };
   return buildMetadata({ title: org.name, description: org.summary, path: `/organisasi/${org.slug}`, image: org.gallery[0] ?? org.logo });
 }
 
 export default async function OrganisasiDetailPage({ params }: Props) {
   const { slug } = await params;
-  const org = organizationSeed.find((o) => o.slug === slug);
+  const org = await getOrganizationBySlug(slug);
 
   return (
     <>

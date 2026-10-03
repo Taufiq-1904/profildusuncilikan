@@ -3,16 +3,17 @@
 import { useRef } from "react";
 import { ImagePlus, X } from "lucide-react";
 import { MediaImage } from "@/components/ui/media-image";
-import { fileToCompressedDataUrl } from "@/lib/image-upload";
+import { uploadImage } from "@/lib/image-upload";
 import { cn } from "@/lib/utils";
 import { hintClass, labelClass } from "./form-styles";
 
 const addTileClass =
   "flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-ink-300 text-sm text-ink-500 transition-colors hover:border-brand-500 hover:text-brand-700";
 
-// Images stay in browser storage for now, so they are shrunk on upload.
+// Gambar dikecilkan lalu diunggah ke Supabase Storage; yang dikembalikan
+// adalah URL publiknya (bukan data URL), jadi database tetap ringan.
 async function readImage(file: File, maxWidth: number): Promise<string> {
-  return fileToCompressedDataUrl(file, maxWidth, 0.78);
+  return uploadImage(file, "umum", maxWidth, 0.78);
 }
 
 export function ImageField({

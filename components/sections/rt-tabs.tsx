@@ -1,24 +1,21 @@
 "use client";
 
 import { useState } from "react";
+import { totalWarga } from "@/lib/data/demografiData";
 import { rtList } from "@/lib/data/wilayahData";
-import type { Official } from "@/lib/data/officialsData";
+import { useDemografi, useWilayahHeads } from "@/lib/hooks/use-directory";
 import { Users, Home, User } from "lucide-react";
 import Link from "next/link";
 
-type Props = {
-  officials: Official[];
-};
-
-export function RTTabs({ officials }: Props) {
+export function RTTabs() {
   const [active, setActive] = useState(0);
+  const demografi = useDemografi();
+  const { headOf, roleOf, ready } = useWilayahHeads();
 
-  const tabs = rtList.map((rt, i) => ({
-    rt,
-    official: officials[i],
-  }));
+  const tabs = rtList.map((rt) => ({ rt }));
 
   const current = tabs[active];
+  const stat = demografi.find((d) => d.rtId === current.rt.id);
 
   return (
     <div>
@@ -52,9 +49,9 @@ export function RTTabs({ officials }: Props) {
             <p className="mb-4 text-xs font-semibold uppercase tracking-wider text-ink-500">Pengurus</p>
             <div className="space-y-3">
               {[
-                { label: "Ketua RT", name: current.rt.ketua },
-                { label: "Sekretaris", name: current.rt.sekretaris ?? "–" },
-                { label: "Bendahara", name: current.rt.bendahara ?? "–" },
+                { label: "Ketua RT", name: headOf(current.rt.id)?.name ?? (ready ? "Belum diisi" : "…") },
+                { label: "Sekretaris", name: roleOf(current.rt.id, "sekretaris")?.name ?? "–" },
+                { label: "Bendahara", name: roleOf(current.rt.id, "bendahara")?.name ?? "–" },
               ].map((p) => (
                 <div key={p.label} className="flex items-center gap-3 rounded-xl bg-cream px-4 py-3">
                   <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-brand-100">
@@ -80,10 +77,12 @@ export function RTTabs({ officials }: Props) {
                 <div>
                   <p className="text-xs text-ink-500">Jumlah Warga</p>
                   <p className="text-sm font-semibold text-ink-900">
-                    {current.rt.jumlahWarga} jiwa
-                    <span className="ml-2 text-xs font-normal text-ink-500">
-                      ({current.rt.jumlahLaki} L · {current.rt.jumlahPerempuan} P)
-                    </span>
+                    {stat ? `${totalWarga(stat)} jiwa` : "Belum diisi"}
+                    {stat && (
+                      <span className="ml-2 text-xs font-normal text-ink-500">
+                        ({stat.laki} L · {stat.perempuan} P)
+                      </span>
+                    )}
                   </p>
                 </div>
               </div>
@@ -93,7 +92,7 @@ export function RTTabs({ officials }: Props) {
                 </div>
                 <div>
                   <p className="text-xs text-ink-500">Jumlah KK</p>
-                  <p className="text-sm font-semibold text-ink-900">{current.rt.jumlahKK} Kepala Keluarga</p>
+                  <p className="text-sm font-semibold text-ink-900">{stat ? `${stat.jumlahKK} Kepala Keluarga` : "Belum diisi"}</p>
                 </div>
               </div>
             </div>

@@ -1,14 +1,16 @@
 import { getSession, canManageWilayah, type SessionUser } from "./auth";
-import { seedNews, type NewsArticle, type NewsStatus } from "./data/newsData";
+import { type NewsArticle, type NewsStatus } from "./data/newsData";
+import { rowToNews } from "./db/mappers";
+import { toUserError } from "./db/errors";
+import { saveWithUniqueSlug } from "./db/slug";
+import { droppedMedia, removeMedia } from "./image-upload";
+import { createRemoteStore } from "./remoteStore";
+import { getSupabase } from "./supabase/client";
 import { slugify } from "./utils";
 
-// Persistence is localStorage for now. Every mutation below re-reads the
-// session and checks the policy itself instead of trusting what the UI
-// passes in, which is the shape a real API route would have. Swapping the
-// storage calls for database queries later should not change the callers.
-
-const STORAGE_KEY = "cilikan_news_v2";
-const CHANGE_EVENT = "cilikan:news-change";
+// Semua data berita disimpan di tabel `news` di Supabase. Setiap mutasi di
+// bawah ini tetap memeriksa sesi dan kebijakan akses sendiri agar pesan
+// errornya jelas; yang benar-benar mengikat adalah Row Level Security.
 
 export class NewsAccessError extends Error {
   constructor(message = "Anda tidak memiliki akses untuk tindakan ini.") {
@@ -32,50 +34,17 @@ export type NewsInput = Pick<
 
 // --- store -----------------------------------------------------------------
 
-let cachedRaw: string | null | undefined;
-let cachedArticles: NewsArticle[] = seedNews;
-
-function readAll(): NewsArticle[] {
-  if (typeof window === "undefined") return seedNews;
-  const raw = localStorage.getItem(STORAGE_KEY);
-  // Same string as last time means the same array reference, which is what
-  // useSyncExternalStore needs to avoid re-rendering in a loop.
-  if (raw === cachedRaw) return cachedArticles;
-  cachedRaw = raw;
-  if (!raw) {
-    cachedArticles = seedNews;
-  } else {
-    try {
-      cachedArticles = JSON.parse(raw) as NewsArticle[];
-    } catch {
-      cachedArticles = seedNews;
-    }
-  }
-  return cachedArticles;
+async function loadNews(): Promise<NewsArticle[]> {
+  const { data, error } = await getSupabase()
+    .from("news")
+    .select("*")
+    .order("published_at", { ascending: false })
+    .order("created_at", { ascending: false });
+  if (error) throw toUserError(error, "Berita gagal dimuat.");
+  return (data ?? []).map(rowToNews);
 }
 
-function writeAll(articles: NewsArticle[]): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(articles));
-  } catch {
-    throw new Error(
-      "Penyimpanan browser penuh. Hapus berita lama atau gunakan gambar sampul yang lebih kecil."
-    );
-  }
-  window.dispatchEvent(new Event(CHANGE_EVENT));
-}
-
-export function subscribeNews(onChange: () => void): () => void {
-  window.addEventListener(CHANGE_EVENT, onChange);
-  window.addEventListener("storage", onChange);
-  return () => {
-    window.removeEventListener(CHANGE_EVENT, onChange);
-    window.removeEventListener("storage", onChange);
-  };
-}
-
-export const getNewsSnapshot = readAll;
-export const getServerNewsSnapshot = (): NewsArticle[] => seedNews;
+export const newsStore = createRemoteStore<NewsArticle>({ load: loadNews });
 
 // --- policy ----------------------------------------------------------------
 
@@ -116,13 +85,12 @@ export function findById(all: NewsArticle[], id: string): NewsArticle | undefine
 
 export { slugify };
 
-function uniqueSlug(base: string, all: NewsArticle[], excludeId?: string): string {
+function guessSlug(base: string, all: NewsArticle[], excludeId?: string): { guess: string; root: string } {
   const root = slugify(base) || "berita";
   const taken = new Set(all.filter((a) => a.id !== excludeId).map((a) => a.slug));
-  if (!taken.has(root)) return root;
-  let n = 2;
-  while (taken.has(`${root}-${n}`)) n += 1;
-  return `${root}-${n}`;
+  let guess = root;
+  for (let n = 2; taken.has(guess); n += 1) guess = `${root}-${n}`;
+  return { guess, root };
 }
 
 // --- mutations -------------------------------------------------------------
@@ -134,38 +102,48 @@ function validate(input: NewsInput): void {
   if (!input.publishedAt) throw new Error("Tanggal publikasi wajib diisi.");
 }
 
-function normalize(input: NewsInput, all: NewsArticle[], excludeId?: string): NewsInput {
+function toRow(input: NewsInput, slug: string) {
   return {
-    ...input,
+    slug,
     title: input.title.trim(),
     excerpt: input.excerpt.trim(),
     content: input.content.map((p) => p.trim()).filter(Boolean),
-    slug: uniqueSlug(input.slug || input.title, all, excludeId),
+    cover_image: input.coverImage ?? null,
+    category_id: input.categoryId,
+    status: input.status,
+    published_at: input.publishedAt,
+    wilayah_id: input.wilayahId,
   };
 }
 
-export function createNews(input: NewsInput): NewsArticle {
+export async function createNews(input: NewsInput): Promise<NewsArticle> {
   const session = requireSession();
   if (!canManageWilayah(session, input.wilayahId)) throw new NewsAccessError();
   validate(input);
 
-  const all = readAll();
-  const now = new Date().toISOString();
-  const article: NewsArticle = {
-    ...normalize(input, all),
-    id: `news-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
-    authorUsername: session.username,
-    authorName: session.displayName,
-    createdAt: now,
-    updatedAt: now,
-  };
-  writeAll([article, ...all]);
-  return article;
+  const supabase = getSupabase();
+  const { guess, root } = guessSlug(input.slug || input.title, newsStore.getState().items);
+  const { data, error } = await saveWithUniqueSlug(guess, root, (slug) =>
+    supabase
+      .from("news")
+      .insert({
+        ...toRow(input, slug),
+        author_id: session.userId,
+        author_username: session.username,
+        author_name: session.displayName,
+      })
+      .select("*")
+      .single()
+  );
+  if (error || !data) throw toUserError(error ?? { message: "no data" }, "Berita gagal disimpan.");
+
+  await newsStore.refresh();
+  return rowToNews(data);
 }
 
-export function updateNews(id: string, input: NewsInput): NewsArticle {
+export async function updateNews(id: string, input: NewsInput): Promise<NewsArticle> {
   const session = requireSession();
-  const all = readAll();
+  const all = newsStore.getState().items;
   const existing = findById(all, id);
   if (!existing) throw new Error("Berita tidak ditemukan.");
   // Both ends are checked: the account must own the current article and the
@@ -175,34 +153,51 @@ export function updateNews(id: string, input: NewsInput): NewsArticle {
   }
   validate(input);
 
-  const updated: NewsArticle = {
-    ...existing,
-    ...normalize(input, all, id),
-    updatedAt: new Date().toISOString(),
-  };
-  writeAll(all.map((a) => (a.id === id ? updated : a)));
-  return updated;
+  const supabase = getSupabase();
+  const { guess, root } = guessSlug(input.slug || input.title, all, id);
+  const { data, error } = await saveWithUniqueSlug(guess, root, (slug) =>
+    supabase.from("news").update(toRow(input, slug)).eq("id", id).select("*").maybeSingle()
+  );
+  if (error) throw toUserError(error, "Berita gagal disimpan.");
+  // RLS menolak update tanpa error: barisnya saja yang tidak ikut terkena.
+  if (!data) throw new NewsAccessError();
+
+  await removeMedia(droppedMedia([existing.coverImage], [input.coverImage]));
+  await newsStore.refresh();
+  return rowToNews(data);
 }
 
-export function setNewsStatus(id: string, status: NewsStatus): NewsArticle {
+export async function setNewsStatus(id: string, status: NewsStatus): Promise<NewsArticle> {
   const session = requireSession();
-  const all = readAll();
-  const existing = findById(all, id);
+  const existing = findById(newsStore.getState().items, id);
   if (!existing) throw new Error("Berita tidak ditemukan.");
   if (!canManageArticle(session, existing)) throw new NewsAccessError();
 
-  const updated = { ...existing, status, updatedAt: new Date().toISOString() };
-  writeAll(all.map((a) => (a.id === id ? updated : a)));
-  return updated;
+  const { data, error } = await getSupabase()
+    .from("news")
+    .update({ status })
+    .eq("id", id)
+    .select("*")
+    .maybeSingle();
+  if (error) throw toUserError(error, "Status berita gagal diubah.");
+  if (!data) throw new NewsAccessError();
+
+  await newsStore.refresh();
+  return rowToNews(data);
 }
 
-export function deleteNews(id: string): void {
+export async function deleteNews(id: string): Promise<void> {
   const session = requireSession();
-  const all = readAll();
-  const existing = findById(all, id);
+  const existing = findById(newsStore.getState().items, id);
   if (!existing) return;
   if (!canManageArticle(session, existing)) throw new NewsAccessError();
-  writeAll(all.filter((a) => a.id !== id));
+
+  const { data, error } = await getSupabase().from("news").delete().eq("id", id).select("id");
+  if (error) throw toUserError(error, "Berita gagal dihapus.");
+  if (!data || data.length === 0) throw new NewsAccessError();
+
+  await removeMedia([existing.coverImage]);
+  await newsStore.refresh();
 }
 
 export type { NewsArticle, NewsStatus };

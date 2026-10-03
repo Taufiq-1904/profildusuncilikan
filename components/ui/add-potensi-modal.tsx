@@ -18,7 +18,8 @@ const KATEGORI_COLORS: Record<Potensi["kategori"], string> = {
 };
 
 type Props = {
-  onAdd: (potensi: Omit<Potensi, "id" | "rtId">) => void;
+  // Boleh async; bila melempar error, dialog tetap terbuka dan menampilkan pesannya.
+  onAdd: (potensi: Omit<Potensi, "id" | "rtId">) => void | Promise<void>;
   onClose: () => void;
   // When given, the dialog edits this entry instead of adding a new one.
   initial?: Potensi;
@@ -29,13 +30,22 @@ export function AddPotensiModal({ onAdd, onClose, initial }: Props) {
   const [deskripsi, setDeskripsi] = useState(initial?.deskripsi ?? "");
   const [kategori, setKategori] = useState<Potensi["kategori"]>(initial?.kategori ?? "Pertanian");
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!judul.trim()) { setError("Judul potensi wajib diisi."); return; }
     if (!deskripsi.trim()) { setError("Deskripsi wajib diisi."); return; }
-    onAdd({ judul: judul.trim(), deskripsi: deskripsi.trim(), kategori });
-    onClose();
+    if (busy) return;
+    setError("");
+    setBusy(true);
+    try {
+      await onAdd({ judul: judul.trim(), deskripsi: deskripsi.trim(), kategori });
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Potensi gagal disimpan.");
+      setBusy(false);
+    }
   }
 
   const inputCls = "w-full rounded-xl border border-line bg-cream-100 px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-300 focus:border-teal-500 focus:outline-none";
@@ -96,11 +106,11 @@ export function AddPotensiModal({ onAdd, onClose, initial }: Props) {
               className="flex-1 rounded-xl border border-line px-4 py-2.5 text-sm font-semibold text-ink-700 hover:bg-cream-100 transition-colors">
               Batal
             </button>
-            <button type="submit"
-              className="flex flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white transition-colors"
+            <button type="submit" disabled={busy}
+              className="flex flex-1 disabled:opacity-60 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white transition-colors"
               style={{ backgroundColor: KATEGORI_COLORS[kategori] }}>
               <Sparkles className="h-4 w-4" />
-              {initial ? "Simpan Perubahan" : "Simpan Potensi"}
+              {busy ? "Menyimpan..." : initial ? "Simpan Perubahan" : "Simpan Potensi"}
             </button>
           </div>
         </form>

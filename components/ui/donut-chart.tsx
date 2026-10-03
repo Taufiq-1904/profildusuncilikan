@@ -28,15 +28,13 @@ export function DonutChart({
   const circumference = 2 * Math.PI * radius;
   const center = size / 2;
 
-  let cumulativePercent = 0;
-
-  const arcs = segments.map((seg) => {
+  const arcs = segments.map((seg, i) => {
     const percent = seg.value / total;
-    const offset = circumference * (1 - cumulativePercent);
+    const before = segments.slice(0, i).reduce((s, prev) => s + prev.value, 0) / total;
+    const offset = circumference * (1 - before);
     const dashArray = `${circumference * percent} ${circumference * (1 - percent)}`;
     // Rotate so 0° is at top
-    const rotate = -90 + 360 * cumulativePercent;
-    cumulativePercent += percent;
+    const rotate = -90 + 360 * before;
     return { ...seg, offset, dashArray, rotate, percent };
   });
 

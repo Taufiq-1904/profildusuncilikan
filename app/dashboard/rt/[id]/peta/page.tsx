@@ -10,7 +10,7 @@ import { AddPinpointModal, type PinFormData } from "@/components/ui/add-pinpoint
 import { useAuth } from "@/components/providers/auth-provider";
 import { canManageWilayah } from "@/lib/auth";
 import { getRTById } from "@/lib/data/wilayahData";
-import { useMapPlaces, usePins } from "@/lib/hooks/use-directory";
+import { useMapPlaces } from "@/lib/hooks/use-directory";
 import { addPin, deletePin } from "@/lib/mapService";
 import { cn } from "@/lib/utils";
 
@@ -20,12 +20,12 @@ export default function RTPetaPage() {
   const rt = getRTById(rtId);
   const { user } = useAuth();
 
-  const pins = usePins();
-  // The map shows everything (pins, UMKM, organizations) for context; only
-  // pins owned by this RT can be added or removed from here.
-  const places = useMapPlaces();
-  const myPins = useMemo(() => pins.filter((p) => p.createdBy === rtId), [pins, rtId]);
+  const { pins, places, refresh } = useMapPlaces();
 
+  const myPins = useMemo(
+    () => pins.filter((p) => p.createdBy === rtId),
+    [pins, rtId]
+  );
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState("");
@@ -37,19 +37,33 @@ export default function RTPetaPage() {
   };
 
   // Errors are thrown on purpose: the modal shows them and stays open.
-  function handleAddPin(data: PinFormData) {
-    addPin({ ...data, createdBy: rtId });
-    setAdding(false);
-  }
-
-  function handleDeletePin(id: string) {
-    if (!confirm("Hapus lokasi ini?")) return;
+  async function handleAddPin(data: PinFormData) {
     setError("");
     try {
-      deletePin(id);
+      await addPin({
+        ...data,
+        createdBy: rtId,
+      });
+
+      await refresh();
+      setAdding(false);
+    } catch (e) {
+      console.error(e);
+      setError(e instanceof Error ? e.message : "Gagal menambahkan lokasi.");
+    }
+  }
+
+  async function handleDeletePin(id: string) {
+    if (!confirm("Hapus lokasi ini?")) return;
+
+    setError("");
+    try {
+      await deletePin(id);
+      await refresh();
       setSelectedId(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Lokasi gagal dihapus.");
+      console.error(e);
+      setError(e instanceof Error ? e.message : "Gagal menghapus lokasi.");
     }
   }
 

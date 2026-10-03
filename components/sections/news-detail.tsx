@@ -11,12 +11,12 @@ import { ArticleView } from "@/components/news/article-view";
 import { NewsCard } from "@/components/cards/news-card";
 import { useAuth } from "@/components/providers/auth-provider";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
-import { useIsClient, useNews } from "@/lib/hooks/use-news";
+import { useNews, useNewsReady } from "@/lib/hooks/use-news";
 import { canManageArticle, findBySlug, selectPublished } from "@/lib/newsService";
 
 export function NewsDetail({ slug }: { slug: string }) {
   const { user } = useAuth();
-  const isClient = useIsClient();
+  const isClient = useNewsReady();
   const all = useNews();
 
   const article = findBySlug(all, slug);
@@ -25,8 +25,8 @@ export function NewsDetail({ slug }: { slug: string }) {
     if (title) document.title = `${title} — Berita`;
   }, [title]);
 
-  // The slug may belong to an article that only exists in this browser's
-  // storage, so wait for the client before deciding it is missing.
+  // Wait until the articles have been loaded from Supabase before deciding
+  // that this slug is missing.
   if (!isClient) return <LoadingSpinner />;
 
   const canPreview = article ? canManageArticle(user, article) : false;

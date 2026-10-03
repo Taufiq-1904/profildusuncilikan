@@ -7,7 +7,8 @@ export function StatCard({
   icon,
 }: {
   label: string;
-  value: number;
+  // null = datanya belum diisi atau belum selesai dimuat.
+  value: number | null;
   suffix?: string;
   icon: string;
 }) {
@@ -19,8 +20,7 @@ export function StatCard({
       </div>
       <div>
         <p className="font-display text-2xl font-semibold text-ink-900 sm:text-3xl">
-          {value.toLocaleString("id-ID")}
-          {suffix}
+          {value === null ? "–" : `${value.toLocaleString("id-ID")}${suffix ?? ""}`}
         </p>
         <p className="text-sm text-ink-500">{label}</p>
       </div>

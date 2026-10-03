@@ -54,7 +54,7 @@ export function UmkmEditor({ umkm, defaultRtId }: { umkm?: UMKM; defaultRtId?: s
 
   const effectiveSlug = slugTouched ? slug : slugify(nama);
 
-  function save() {
+  async function save() {
     setError("");
     const latitude = parseCoordinate(location.lat);
     const longitude = parseCoordinate(location.lng);
@@ -84,8 +84,8 @@ export function UmkmEditor({ umkm, defaultRtId }: { umkm?: UMKM; defaultRtId?: s
       rtId,
     };
     try {
-      if (umkm) updateUmkm(umkm.id, input);
-      else createUmkm(input);
+      if (umkm) await updateUmkm(umkm.id, input);
+      else await createUmkm(input);
       router.push("/dashboard/umkm");
     } catch (e) {
       setError(e instanceof Error ? e.message : "UMKM gagal disimpan.");

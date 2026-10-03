@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Pencil } from "lucide-react";
 import { useAuth } from "@/components/providers/auth-provider";
-import type { Role } from "@/lib/data/authData";
+import type { Role } from "@/lib/auth";
 
 // A visible strip near the top of a public page for signed-in managers, so
 // the edit action is not buried at the bottom of the page.

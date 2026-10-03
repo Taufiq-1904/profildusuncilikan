@@ -8,7 +8,7 @@ import { ArticleView } from "@/components/news/article-view";
 import { NewsCover } from "@/components/news/news-cover";
 import { getManageableWilayah } from "@/lib/auth";
 import { newsCategories, type NewsArticle, type NewsStatus } from "@/lib/data/newsData";
-import { fileToCompressedDataUrl } from "@/lib/image-upload";
+import { uploadImage } from "@/lib/image-upload";
 import { createNews, slugify, updateNews } from "@/lib/newsService";
 import { cn } from "@/lib/utils";
 
@@ -46,14 +46,14 @@ export function NewsEditor({ article }: { article?: NewsArticle }) {
     if (!file) return;
     setError("");
     try {
-      setCoverImage(await fileToCompressedDataUrl(file));
+      setCoverImage(await uploadImage(file, "berita"));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Gagal memproses gambar.");
     }
     if (fileInput.current) fileInput.current.value = "";
   }
 
-  function save(status: NewsStatus) {
+  async function save(status: NewsStatus) {
     setError("");
     setBusy(true);
     const input = {
@@ -68,8 +68,8 @@ export function NewsEditor({ article }: { article?: NewsArticle }) {
       wilayahId,
     };
     try {
-      if (article) updateNews(article.id, input);
-      else createNews(input);
+      if (article) await updateNews(article.id, input);
+      else await createNews(input);
       router.push("/dashboard/berita");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Berita gagal disimpan.");

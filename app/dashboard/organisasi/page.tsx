@@ -23,11 +23,11 @@ export default function DashboardOrganisasiPage() {
   const manageable = useMemo(() => selectManageableOrganizations(all, user), [all, user]);
   const visible = manageable.filter((o) => wilayah === "semua" || o.wilayahId === wilayah);
 
-  function handleDelete(id: string, name: string) {
+  async function handleDelete(id: string, name: string) {
     if (!confirm(`Hapus organisasi "${name}"?`)) return;
     setError("");
     try {
-      deleteOrganization(id);
+      await deleteOrganization(id);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Organisasi gagal dihapus.");
     }

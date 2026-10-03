@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { NewsEditor } from "@/components/dashboard/news-editor";
 import { useAuth } from "@/components/providers/auth-provider";
-import { useIsClient, useNews } from "@/lib/hooks/use-news";
+import { useNews, useNewsReady } from "@/lib/hooks/use-news";
 import { canManageArticle, findById } from "@/lib/newsService";
 
 function Notice({ message }: { message: string }) {
@@ -21,11 +21,11 @@ function Notice({ message }: { message: string }) {
 export default function EditBeritaPage() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
-  const isClient = useIsClient();
+  const isClient = useNewsReady();
   const all = useNews();
 
   // The editor copies the article into form state once on mount, so it must
-  // not mount until the real stored list (not the seed) is available.
+  // not mount until the list has been loaded from Supabase.
   if (!isClient) return null;
 
   const article = findById(all, id);

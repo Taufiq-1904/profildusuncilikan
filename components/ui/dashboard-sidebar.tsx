@@ -38,8 +38,8 @@ const navItems: NavItem[] = [
   { href: "/dashboard/berita", label: "Berita", icon: Newspaper },
   { href: "/dashboard/organisasi", label: "Organisasi", icon: Users },
   { href: "/dashboard/umkm", label: "UMKM", icon: Store },
-  // The dusun chart and the dusun-wide map belong to the dusun account.
-  { href: "/dashboard/struktur", label: "Struktur Dusun", icon: Network, dusunOnly: true },
+  // Struktur: tiap akun mengisi bagan wilayahnya sendiri. Peta dusun khusus akun Dusun.
+  { href: "/dashboard/struktur", label: "Struktur", icon: Network },
   { href: "/dashboard/peta", label: "Peta Dusun", icon: Map, dusunOnly: true },
   { href: "/dashboard/akun", label: "Akun & Password", icon: KeyRound },
 ];
@@ -49,8 +49,8 @@ export function DashboardSidebar() {
   const router = useRouter();
   const { user, signOut } = useAuth();
 
-  function handleSignOut() {
-    signOut();
+  async function handleSignOut() {
+    await signOut();
     router.push("/login");
   }
 
@@ -70,12 +70,13 @@ export function DashboardSidebar() {
     : [];
 
   // Closed by default; opened only on mobile via the hamburger button below.
-  const [open, setOpen] = useState(false);
+  // Remember which page the drawer was opened on; it counts as closed as soon
+  // as the pathname changes, so navigating never leaves it open.
+  const [openOn, setOpenOn] = useState<string | null>(null);
+  const open = openOn === pathname;
+  const setOpen = (next: boolean) => setOpenOn(next ? pathname : null);
 
-  // Close the drawer on navigation, and lock page scroll while it is open.
-  useEffect(() => {
-    setOpen(false);
-  }, [pathname]);
+  // Lock page scroll while the drawer is open.
   useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "";
     return () => {

@@ -15,8 +15,7 @@ import { MediaImage } from "@/components/ui/media-image";
 import { PhotoGallery } from "@/components/ui/photo-gallery";
 import { getOrganizationFieldName } from "@/lib/data/organizationData";
 import { getWilayahLabel } from "@/lib/data/wilayahData";
-import { useOrganizations } from "@/lib/hooks/use-directory";
-import { useIsClient } from "@/lib/hooks/use-news";
+import { useOrganizations, useOrganizationsReady } from "@/lib/hooks/use-directory";
 import { facebookUrl, googleMapsDirectionsUrl, googleMapsUrl, instagramUrl, safeExternalUrl, whatsappUrl } from "@/lib/links";
 import { canManageOrganization, findOrganizationBySlug } from "@/lib/organizationService";
 
@@ -36,18 +35,16 @@ const linkClass = "font-medium text-brand-700 hover:text-brand-800 hover:underli
 
 export function OrganizationDetail({ slug }: { slug: string }) {
   const { user } = useAuth();
-  const isClient = useIsClient();
+  const isClient = useOrganizationsReady();
   const org = findOrganizationBySlug(useOrganizations(), slug);
 
-  // Keeps the tab title right for organizations added from the dashboard,
-  // which the server cannot know about yet.
+  // Keeps the tab title right once the organization has loaded.
   const name = org?.name;
   useEffect(() => {
     if (name) document.title = `${name} — Organisasi & Komunitas`;
   }, [name]);
 
-  // A slug that only exists in this browser's storage is not known until the
-  // client has taken over, so only give up on it after that.
+  // Only give up on a slug after the list has been loaded from Supabase.
   if (!org) {
     if (!isClient) return <LoadingSpinner />;
     notFound();

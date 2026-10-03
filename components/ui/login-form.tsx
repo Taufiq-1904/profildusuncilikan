@@ -21,15 +21,14 @@ export function LoginForm() {
     setError("");
     setLoading(true);
     try {
-      await new Promise((r) => setTimeout(r, 300)); // short delay for UX
-      const ok = signIn(username, password);
+      const ok = await signIn(username, password);
       if (!ok) {
         setError("Username atau password salah. Periksa huruf besar/kecil pada password lalu coba lagi.");
         return;
       }
       router.push("/dashboard");
-    } catch {
-      setError("Terjadi kesalahan saat masuk. Muat ulang halaman lalu coba lagi.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Terjadi kesalahan saat masuk. Muat ulang halaman lalu coba lagi.");
     } finally {
       // Always release the button, so a failure can never leave it stuck on
       // "Memverifikasi...".
@@ -65,7 +64,7 @@ export function LoginForm() {
               spellCheck={false}
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="admin / rw09 / rt01 ..."
+              placeholder="username atau email"
               className="w-full rounded-xl border border-line bg-cream py-3 pl-10 pr-4 text-sm text-ink-900 placeholder:text-ink-300 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
               required
             />

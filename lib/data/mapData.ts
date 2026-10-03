@@ -16,7 +16,7 @@ export type MapPin = {
   lng: number;
   kontak?: string;
   alamat?: string;
-  // Data URL for now; storage URL once there is a real backend.
+  // Public URL in Supabase Storage (bucket "media").
   foto?: string;
   mapsUrl?: string;
   // Generic wilayahId: "dusun", an RW id ("rw09"), or an RT id ("rt01").
@@ -46,18 +46,3 @@ export const CATEGORY_COLORS: Record<PinCategory, string> = {
 
 // Center of Dusun Cilikan, Umbulmartani
 export const DUSUN_CENTER: [number, number] = [-7.7028, 110.4219];
-
-// Businesses live in the UMKM directory now and appear on the map from there.
-export const initialPins: MapPin[] = [
-  {
-    id: "pin-001",
-    nama: "Balai Dusun Cilikan",
-    deskripsi: "Pusat kegiatan warga, musyawarah, dan layanan administrasi dusun.",
-    kategori: "Fasilitas Umum",
-    lat: -7.7028,
-    lng: 110.4219,
-    kontak: "(0274) 895-123",
-    createdBy: "dusun",
-    createdAt: "2024-01-01",
-  },
-];

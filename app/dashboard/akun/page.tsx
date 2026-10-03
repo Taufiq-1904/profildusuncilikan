@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Eye, EyeOff, KeyRound, ShieldAlert, UserCog } from "lucide-react";
+import { Eye, EyeOff, KeyRound, UserCog } from "lucide-react";
 import {
   errorClass,
   fieldClass,
@@ -18,7 +18,6 @@ import {
   getSession,
   listManagedAccounts,
   resetAccountPassword,
-  subscribeAuth,
   type ManagedAccount,
 } from "@/lib/auth";
 import { getWilayahLabel } from "@/lib/data/wilayahData";
@@ -79,12 +78,12 @@ function ChangePasswordForm() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setSuccess("");
     try {
-      changeOwnPassword(current, next, confirm);
+      await changeOwnPassword(current, next, confirm);
       setCurrent("");
       setNext("");
       setConfirm("");
@@ -125,12 +124,12 @@ function ChangeUsernameForm({ currentUsername }: { currentUsername: string }) {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setSuccess("");
     try {
-      changeOwnUsername(username, password);
+      await changeOwnUsername(username, password);
       setUsername("");
       setPassword("");
       setSuccess("Username berhasil diubah. Gunakan username baru saat masuk berikutnya.");
@@ -180,12 +179,12 @@ function ResetRow({ account }: { account: ManagedAccount }) {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setSuccess("");
     try {
-      resetAccountPassword(account.id, password);
+      await resetAccountPassword(account.id, password);
       setPassword("");
       setOpen(false);
       setSuccess("Password diatur ulang.");
@@ -201,8 +200,7 @@ function ResetRow({ account }: { account: ManagedAccount }) {
           <p className="text-sm font-semibold text-ink-900">{account.displayName}</p>
           <p className="text-xs text-ink-500">
             Username <span className="font-semibold text-ink-700">{account.username}</span> ·{" "}
-            {getWilayahLabel(account.wilayahId)} ·{" "}
-            {account.passwordChanged ? "password sudah diganti" : "masih password bawaan"}
+            {getWilayahLabel(account.wilayahId)}
           </p>
         </div>
         <button
@@ -234,12 +232,21 @@ export default function AkunPage() {
   const { user } = useAuth();
   const role = user?.role;
   const [accounts, setAccounts] = useState<ManagedAccount[]>([]);
+  const [accountsError, setAccountsError] = useState("");
 
-  // Re-read the account list whenever credentials change.
+  // Daftar akun RW/RT dibaca dari Supabase (hanya akun Dusun yang berhak).
   useEffect(() => {
-    const refresh = () => setAccounts(listManagedAccounts(getSession()));
-    refresh();
-    return subscribeAuth(refresh);
+    let alive = true;
+    listManagedAccounts(getSession())
+      .then((list) => {
+        if (alive) setAccounts(list);
+      })
+      .catch((e) => {
+        if (alive) setAccountsError(e instanceof Error ? e.message : "Daftar akun gagal dimuat.");
+      });
+    return () => {
+      alive = false;
+    };
   }, [role]);
 
   if (!user) return null;
@@ -254,14 +261,6 @@ export default function AkunPage() {
         </p>
       </div>
 
-      <div className="mb-6 flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-        <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
-        <p>
-          Website ini belum memakai server, jadi password baru tersimpan di browser perangkat ini saja. Di perangkat
-          lain, login masih memakai password bawaan sampai password diganti di perangkat itu juga.
-        </p>
-      </div>
-
       <div className="grid gap-6 lg:grid-cols-2">
         <ChangePasswordForm />
         <ChangeUsernameForm currentUsername={user.username} />
@@ -272,6 +271,7 @@ export default function AkunPage() {
           <h2 id="akun-pengelola" className="mb-3 font-display text-lg font-semibold text-ink-900">
             Akun pengelola RW &amp; RT
           </h2>
+          {accountsError && <p role="alert" className={`${errorClass} mb-3`}>{accountsError}</p>}
           <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-paper shadow-sm">
             {accounts.map((a) => (
               <ResetRow key={a.id} account={a} />

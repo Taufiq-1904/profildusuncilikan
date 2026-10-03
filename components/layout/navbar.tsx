@@ -38,9 +38,9 @@ function NavbarInner({ pathname }: { pathname: string }) {
   const [open, setOpen] = useState(false);
   const { user, signOut } = useAuth();
 
-  function handleSignOut() {
-    signOut();
+  async function handleSignOut() {
     setOpen(false);
+    await signOut();
   }
 
   useEffect(() => {

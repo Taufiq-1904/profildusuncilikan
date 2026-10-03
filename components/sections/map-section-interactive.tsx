@@ -1,13 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { MapPin, ExternalLink } from "lucide-react";
 import { Container } from "@/components/layout/container";
 import { SectionHeading } from "@/components/sections/section-heading";
-import { CATEGORY_COLORS, type MapPin as MapPinType } from "@/lib/data/mapData";
-import { getPins } from "@/lib/mapService";
+import { CATEGORY_COLORS } from "@/lib/data/mapData";
+import { usePins } from "@/lib/hooks/use-directory";
 
 // Dynamically import map to avoid SSR issues
 const InteractiveMap = dynamic(
@@ -26,13 +25,8 @@ const InteractiveMap = dynamic(
 );
 
 export function MapSectionInteractive({ compact = false }: { compact?: boolean }) {
-  const [pins, setPins] = useState<MapPinType[]>([]);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setPins(getPins());
-    setMounted(true);
-  }, []);
+  const { pins, loading } = usePins();
+  const mounted = !loading;
 
   // Category legend
   const uniqueCategories = [...new Set(pins.map((p) => p.kategori))];

@@ -8,6 +8,7 @@ import { ImagePlaceholder } from "@/components/ui/image-placeholder";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { PotentialCard } from "@/components/cards/potential-card";
+import { PotentialLeader } from "@/components/sections/potential-leader";
 import { potentials } from "@/lib/data/potentialsData";
 
 export function generateStaticParams() {
@@ -69,6 +70,7 @@ export default async function PotensiDetailPage({
               <p className="mt-4 text-base leading-relaxed text-ink-500">
                 {potential.summary}
               </p>
+              <PotentialLeader organizationSlug={potential.organizationSlug} />
 
               <div className="mt-8 space-y-4">
                 {potential.description.map((para, i) => (

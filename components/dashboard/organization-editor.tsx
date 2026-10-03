@@ -93,7 +93,7 @@ export function OrganizationEditor({ organization }: { organization?: Organizati
     if (on && members.length === 0) addMember();
   }
 
-  function save() {
+  async function save() {
     setError("");
     const lat = parseCoordinate(location.lat);
     const lng = parseCoordinate(location.lng);
@@ -124,8 +124,8 @@ export function OrganizationEditor({ organization }: { organization?: Organizati
       members: hasStructure ? members.map((m) => ({ name: m.name, position: m.position })) : undefined,
     };
     try {
-      if (organization) updateOrganization(organization.id, input);
-      else createOrganization(input);
+      if (organization) await updateOrganization(organization.id, input);
+      else await createOrganization(input);
       router.push("/dashboard/organisasi");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Organisasi gagal disimpan.");

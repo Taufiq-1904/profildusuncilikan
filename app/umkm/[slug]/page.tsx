@@ -1,17 +1,16 @@
 import type { Metadata } from "next";
 import { UmkmDetail } from "@/components/sections/umkm-detail";
 import { JsonLd } from "@/components/seo/json-ld";
-import { umkmSeed } from "@/lib/data/umkmData";
 import { getRTWithRWLabel } from "@/lib/data/wilayahData";
 import { buildMetadata } from "@/lib/seo";
+import { getActiveUmkmBySlug } from "@/lib/server/public-content";
 
 type Props = { params: Promise<{ slug: string }> };
 
-// Same limitation as organizations: only seed businesses are visible to the
-// server, the rest get their tab title set in the browser.
+// Metadata dan JSON-LD dibaca dari Supabase di server (hanya UMKM yang aktif).
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
-  const umkm = umkmSeed.find((u) => u.slug === slug && u.aktif);
+  const umkm = await getActiveUmkmBySlug(slug);
   if (!umkm) return { title: "UMKM Dusun" };
   return buildMetadata({
     title: umkm.nama,
@@ -23,7 +22,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function UmkmDetailPage({ params }: Props) {
   const { slug } = await params;
-  const umkm = umkmSeed.find((u) => u.slug === slug && u.aktif);
+  const umkm = await getActiveUmkmBySlug(slug);
 
   return (
     <>

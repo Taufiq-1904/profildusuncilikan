@@ -5,15 +5,13 @@ import { Breadcrumb } from "@/components/layout/breadcrumb";
 import { Container } from "@/components/layout/container";
 import { SectionHeading } from "@/components/sections/section-heading";
 import { Timeline } from "@/components/sections/timeline";
-import { BarStat } from "@/components/sections/bar-stat";
+import { DemografiSection, WilayahSection } from "@/components/sections/kependudukan";
 import { Card } from "@/components/ui/card";
 import {
   villageHistory,
   villageVision,
   villageMissions,
   geography,
-  demographics,
-  administrativeAreas,
 } from "@/lib/data/villageData";
 import { siteConfig } from "@/lib/data/siteConfig";
 
@@ -113,79 +111,8 @@ export default function ProfilPage() {
         </Container>
       </section>
 
-      {/* Demografi */}
-      <section className="bg-cream py-20 sm:py-24">
-        <Container>
-          <SectionHeading eyebrow="Kependudukan" title="Demografi Dusun" className="mb-10" />
-          <div className="grid gap-10 lg:grid-cols-2">
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-2">
-              {[
-                { label: "Total Penduduk", value: demographics.total },
-                { label: "Laki-laki", value: demographics.male },
-                { label: "Perempuan", value: demographics.female },
-                { label: "Kepala Keluarga", value: demographics.households },
-              ].map((item) => (
-                <Card key={item.label} className="p-5">
-                  <p className="font-display text-2xl font-semibold text-ink-900">
-                    {item.value.toLocaleString("id-ID")}
-                  </p>
-                  <p className="mt-1 text-sm text-ink-500">{item.label}</p>
-                </Card>
-              ))}
-            </div>
-            <div className="space-y-8">
-              <div>
-                <h3 className="mb-4 font-display text-base font-semibold text-ink-900">
-                  Berdasarkan Kelompok Usia
-                </h3>
-                <BarStat data={demographics.byAge} total={demographics.total} />
-              </div>
-              <div>
-                <h3 className="mb-4 font-display text-base font-semibold text-ink-900">
-                  Berdasarkan Mata Pencaharian
-                </h3>
-                <BarStat data={demographics.byLivelihood} total={demographics.total} />
-              </div>
-            </div>
-          </div>
-        </Container>
-      </section>
-
-      {/* Wilayah Administratif */}
-      <section className="py-20 sm:py-24">
-        <Container>
-          <SectionHeading
-            eyebrow="Wilayah Administratif"
-            title="RT dan RW Dusun Cilikan"
-            description="Dusun Cilikan berada di Kalurahan Umbulmartani dan terbagi ke dalam 4 RT dalam 1 RW, dengan total 142 kepala keluarga."
-            className="mb-10"
-          />
-          <div className="overflow-x-auto rounded-2xl border border-line">
-            <table className="w-full min-w-[560px] text-left text-sm">
-              <thead className="bg-brand-50 text-xs font-semibold uppercase tracking-wide text-brand-800">
-                <tr>
-                  <th className="px-5 py-3.5">Wilayah RT</th>
-                  <th className="px-5 py-3.5">Ketua RT</th>
-                  <th className="px-5 py-3.5">Nomor RT</th>
-                  <th className="px-5 py-3.5">Nomor RW</th>
-                  <th className="px-5 py-3.5">Kepala Keluarga</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line">
-                {administrativeAreas.map((area) => (
-                  <tr key={area.name} className="hover:bg-cream-100/60">
-                    <td className="px-5 py-4 font-medium text-ink-900">{area.name}</td>
-                    <td className="px-5 py-4 text-ink-700">{area.head}</td>
-                    <td className="px-5 py-4 text-ink-700">{area.rt}</td>
-                    <td className="px-5 py-4 text-ink-700">{area.rw}</td>
-                    <td className="px-5 py-4 text-ink-700">{area.households}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Container>
-      </section>
+      <DemografiSection />
+      <WilayahSection />
     </>
   );
 }

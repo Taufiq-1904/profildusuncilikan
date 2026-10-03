@@ -1,13 +1,14 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { getSession, login, logout, subscribeAuth, type SessionUser } from "@/lib/auth";
+import { getSession, initAuth, login, logout, subscribeAuth, type SessionUser } from "@/lib/auth";
 
 type AuthContextType = {
   user: SessionUser | null;
   isLoading: boolean;
-  signIn: (username: string, password: string) => boolean;
-  signOut: () => void;
+  // true bila berhasil; false bila username/password salah. Kesalahan lain dilempar.
+  signIn: (username: string, password: string) => Promise<boolean>;
+  signOut: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -17,22 +18,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    setUser(getSession());
-    setIsLoading(false);
-    // Keeps the header/sidebar in sync when the username changes or when
-    // another tab signs in or out.
-    return subscribeAuth(() => setUser(getSession()));
+    let alive = true;
+    // Memulihkan sesi Supabase dari cookie, lalu mengikuti perubahannya
+    // (login/logout di tab lain, ganti username, token diperbarui).
+    const unsubscribe = subscribeAuth(() => {
+      if (alive) setUser(getSession());
+    });
+    void initAuth().finally(() => {
+      if (!alive) return;
+      setUser(getSession());
+      setIsLoading(false);
+    });
+    return () => {
+      alive = false;
+      unsubscribe();
+    };
   }, []);
 
-  function signIn(username: string, password: string): boolean {
-    const session = login(username, password);
+  async function signIn(username: string, password: string): Promise<boolean> {
+    const session = await login(username, password);
     if (!session) return false;
     setUser(session);
     return true;
   }
 
-  function signOut() {
-    logout();
+  async function signOut(): Promise<void> {
+    await logout();
     setUser(null);
   }
 

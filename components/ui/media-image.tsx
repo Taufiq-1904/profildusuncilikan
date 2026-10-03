@@ -5,7 +5,8 @@ import { cn } from "@/lib/utils";
 type Tone = "green" | "gold" | "sky" | "clay";
 
 // One place for "uploaded image, or a neutral placeholder when there is none".
-// Uploaded images are data URLs today, hence `unoptimized`.
+// Uploaded images are public Supabase Storage URLs; `unoptimized` keeps them
+// served straight from Supabase's CDN.
 export function MediaImage({
   src,
   alt,

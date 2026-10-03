@@ -225,7 +225,150 @@ drop policy if exists "media_delete" on storage.objects;
 create policy "media_delete" on storage.objects for delete to authenticated
   using (bucket_id = 'media' and exists (select 1 from public.profiles where id = auth.uid()));
 
--- 7. SETELAH MEMBUAT USER DI Authentication > Users, DAFTARKAN PROFILNYA --------
+-- 7. LOGIN DENGAN USERNAME, TABEL TAMBAHAN, TRIGGER ------------------------------
+-- Bagian ini yang membuat seluruh fitur aplikasi (login username, potensi RT,
+-- kependudukan) tersimpan di Supabase. Aman dijalankan ulang.
+
+-- 7a. Username untuk login (Supabase Auth sendiri memakai email)
+alter table public.profiles add column if not exists username text;
+create unique index if not exists profiles_username_key on public.profiles (lower(username));
+
+-- Mengubah email login "username" -> email, supaya form login cukup meminta username.
+-- Hanya mengembalikan email; password tetap diverifikasi oleh Supabase Auth.
+create or replace function public.login_email(p_username text)
+returns text
+language sql stable security definer set search_path = public, auth
+as $$
+  select u.email::text
+  from public.profiles p
+  join auth.users u on u.id = p.id
+  where lower(p.username) = lower(trim(p_username))
+  limit 1;
+$$;
+revoke all on function public.login_email(text) from public;
+grant execute on function public.login_email(text) to anon, authenticated;
+
+-- Pengelola hanya boleh mengubah USERNAME miliknya sendiri. Role dan wilayah
+-- tidak bisa diubah dari browser (tidak ada policy update pada profiles).
+create or replace function public.change_my_username(p_username text)
+returns void
+language plpgsql security definer set search_path = public
+as $$
+begin
+  if auth.uid() is null then
+    raise exception 'Belum login';
+  end if;
+  if p_username !~ '^[a-z0-9._-]{3,30}$' then
+    raise exception 'Username tidak valid';
+  end if;
+  update public.profiles set username = p_username where id = auth.uid();
+  if not found then
+    raise exception 'Profil pengelola tidak ditemukan';
+  end if;
+end;
+$$;
+revoke all on function public.change_my_username(text) from public;
+grant execute on function public.change_my_username(text) to authenticated;
+
+-- 7b. Kolom tambahan
+alter table public.news add column if not exists author_username text not null default '';
+
+-- 7c. Potensi RT
+create table if not exists public.rt_potensi (
+  id         uuid primary key default gen_random_uuid(),
+  rt_id      text not null references public.wilayah(id),
+  judul      text not null,
+  deskripsi  text not null default '',
+  kategori   text not null default 'Lainnya',
+  created_by uuid references auth.users(id) default auth.uid(),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.rt_potensi enable row level security;
+
+drop policy if exists "potensi_read" on public.rt_potensi;
+create policy "potensi_read" on public.rt_potensi for select using (true);
+drop policy if exists "potensi_write" on public.rt_potensi;
+create policy "potensi_write" on public.rt_potensi for all
+  using (public.can_manage_wilayah(rt_id))
+  with check (public.can_manage_wilayah(rt_id));
+
+-- 7d. Kependudukan per RT (angka agregat, bukan data individu warga).
+-- Satu baris per RT. RT yang barisnya belum ada dianggap "belum diisi".
+create table if not exists public.rt_demografi (
+  rt_id         text primary key references public.wilayah(id),
+  jumlah_kk     int not null default 0 check (jumlah_kk >= 0),
+  laki          int not null default 0 check (laki >= 0),
+  perempuan     int not null default 0 check (perempuan >= 0),
+  -- Urutan tetap: 0-4, 5-14, 15-24, 25-44, 45-59, 60+
+  kelompok_umur int[] not null default '{0,0,0,0,0,0}'
+                check (cardinality(kelompok_umur) = 6 and 0 <= all (kelompok_umur)),
+  updated_at    timestamptz not null default now()
+);
+
+alter table public.rt_demografi enable row level security;
+
+drop policy if exists "demografi_read" on public.rt_demografi;
+create policy "demografi_read" on public.rt_demografi for select using (true);
+drop policy if exists "demografi_write" on public.rt_demografi;
+create policy "demografi_write" on public.rt_demografi for all
+  using (public.can_manage_wilayah(rt_id))
+  with check (public.can_manage_wilayah(rt_id));
+
+-- 7e. updated_at otomatis
+create or replace function public.touch_updated_at()
+returns trigger language plpgsql as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_news_touch on public.news;
+create trigger trg_news_touch before update on public.news
+  for each row execute function public.touch_updated_at();
+drop trigger if exists trg_umkm_touch on public.umkm;
+create trigger trg_umkm_touch before update on public.umkm
+  for each row execute function public.touch_updated_at();
+drop trigger if exists trg_org_touch on public.organizations;
+create trigger trg_org_touch before update on public.organizations
+  for each row execute function public.touch_updated_at();
+drop trigger if exists trg_off_touch on public.dusun_officials;
+create trigger trg_off_touch before update on public.dusun_officials
+  for each row execute function public.touch_updated_at();
+drop trigger if exists trg_demografi_touch on public.rt_demografi;
+create trigger trg_demografi_touch before update on public.rt_demografi
+  for each row execute function public.touch_updated_at();
+drop trigger if exists trg_potensi_touch on public.rt_potensi;
+create trigger trg_potensi_touch before update on public.rt_potensi
+  for each row execute function public.touch_updated_at();
+
+-- 7f. Struktur per wilayah + kepala wilayah ------------------------------------
+-- Setiap baris struktur dimiliki satu wilayah (owner_id): 'dusun', 'rw09', 'rt01', ...
+-- Akun Dusun mengisi struktur dusun, akun RW mengisi struktur RW-nya (dan RT di
+-- bawahnya), akun RT mengisi struktur RT-nya. Aturannya dijalankan di database
+-- lewat can_manage_wilayah(), bukan hanya disembunyikan di tampilan.
+--
+-- wilayah_id menandai baris yang merupakan KEPALA wilayah itu (dukuh / ketua RW /
+-- ketua RT). Beranda, Pemerintahan, tabel RT, dan dashboard membaca nama ketua
+-- dari sini, jadi nama ketua tidak ditulis di kode.
+alter table public.dusun_officials add column if not exists owner_id text not null default 'dusun' references public.wilayah(id);
+alter table public.dusun_officials add column if not exists wilayah_id text references public.wilayah(id);
+create unique index if not exists dusun_officials_wilayah_key
+  on public.dusun_officials (wilayah_id) where wilayah_id is not null;
+create index if not exists dusun_officials_owner_idx on public.dusun_officials (owner_id);
+do $$ begin
+  alter table public.dusun_officials
+    add constraint dusun_officials_head_own check (wilayah_id is null or wilayah_id = owner_id);
+exception when duplicate_object then null; end $$;
+
+drop policy if exists "off_write" on public.dusun_officials;
+create policy "off_write" on public.dusun_officials for all
+  using (public.can_manage_wilayah(owner_id))
+  with check (public.can_manage_wilayah(owner_id));
+
+-- 8. SETELAH MEMBUAT USER DI Authentication > Users, DAFTARKAN PROFILNYA --------
 -- Contoh (ganti UUID dengan id user dari dashboard Supabase):
--- insert into public.profiles (id, display_name, role, wilayah_id) values
---   ('00000000-0000-0000-0000-000000000000', 'Admin Dusun Cilikan', 'dusun', 'dusun');
+-- insert into public.profiles (id, username, display_name, role, wilayah_id) values
+--   ('00000000-0000-0000-0000-000000000000', 'admin', 'Admin Dusun Cilikan', 'dusun', 'dusun');

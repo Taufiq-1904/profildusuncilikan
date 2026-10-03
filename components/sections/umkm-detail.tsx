@@ -13,8 +13,7 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { MediaImage } from "@/components/ui/media-image";
 import { PhotoGallery } from "@/components/ui/photo-gallery";
 import { getRTWithRWLabel } from "@/lib/data/wilayahData";
-import { useUmkm } from "@/lib/hooks/use-directory";
-import { useIsClient } from "@/lib/hooks/use-news";
+import { useUmkm, useUmkmReady } from "@/lib/hooks/use-directory";
 import { googleMapsDirectionsUrl, googleMapsUrl, isPhoneLike, whatsappUrl } from "@/lib/links";
 import { canManageUmkm, findUmkmBySlug } from "@/lib/umkmService";
 import { cn } from "@/lib/utils";
@@ -36,7 +35,7 @@ const actionClass =
 
 export function UmkmDetail({ slug }: { slug: string }) {
   const { user } = useAuth();
-  const isClient = useIsClient();
+  const isClient = useUmkmReady();
   const umkm = findUmkmBySlug(useUmkm(), slug);
 
   const name = umkm?.nama;

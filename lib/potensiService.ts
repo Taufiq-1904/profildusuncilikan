@@ -1,48 +1,80 @@
-import { potensiSeed, type RTPotensi } from "./data/potensiData";
+import { requireSession, requireWilayah } from "./access";
+import { type RTPotensi } from "./data/potensiData";
+import { rowToPotensi } from "./db/mappers";
+import { toUserError } from "./db/errors";
+import { createRemoteStore } from "./remoteStore";
+import { getSupabase } from "./supabase/client";
 
-const STORAGE_KEY = "cilikan_potensi_rt";
-
-function getStore(): RTPotensi[] {
-  if (typeof window === "undefined") return potensiSeed;
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(potensiSeed));
-    return potensiSeed;
-  }
-  try {
-    return JSON.parse(raw) as RTPotensi[];
-  } catch {
-    return potensiSeed;
-  }
+async function loadPotensi(): Promise<RTPotensi[]> {
+  const { data, error } = await getSupabase()
+    .from("rt_potensi")
+    .select("*")
+    .order("created_at", { ascending: true });
+  if (error) throw toUserError(error, "Data potensi gagal dimuat.");
+  return (data ?? []).map(rowToPotensi);
 }
 
-function saveStore(data: RTPotensi[]): void {
-  if (typeof window !== "undefined") {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  }
+export const potensiStore = createRemoteStore<RTPotensi>({ load: loadPotensi });
+
+export type PotensiInput = Omit<RTPotensi, "id" | "rtId">;
+
+export function selectPotensiByRT(all: RTPotensi[], rtId: string): RTPotensi[] {
+  return all.filter((p) => p.rtId === rtId);
 }
 
-export function getAllPotensiRT(): RTPotensi[] {
-  return getStore();
+function validate(data: PotensiInput): void {
+  if (!data.judul.trim()) throw new Error("Judul potensi wajib diisi.");
 }
 
-export function getPotensiByRT(rtId: string): RTPotensi[] {
-  return getStore().filter((p) => p.rtId === rtId);
+export async function addPotensiRT(rtId: string, potensi: PotensiInput): Promise<RTPotensi> {
+  requireWilayah(requireSession(), rtId);
+  validate(potensi);
+
+  const { data, error } = await getSupabase()
+    .from("rt_potensi")
+    .insert({
+      rt_id: rtId,
+      judul: potensi.judul.trim(),
+      deskripsi: potensi.deskripsi.trim(),
+      kategori: potensi.kategori,
+    })
+    .select("*")
+    .single();
+  if (error || !data) throw toUserError(error ?? { message: "no data" }, "Potensi gagal disimpan.");
+
+  await potensiStore.refresh();
+  return rowToPotensi(data);
 }
 
-export function addPotensiRT(rtId: string, potensi: Omit<RTPotensi, "id" | "rtId">): RTPotensi {
-  const all = getStore();
-  const newPotensi: RTPotensi = { ...potensi, id: `pot-${rtId}-${Date.now()}`, rtId };
-  saveStore([...all, newPotensi]);
-  return newPotensi;
+export async function updatePotensiRT(id: string, data: PotensiInput): Promise<void> {
+  const session = requireSession();
+  const existing = potensiStore.getState().items.find((p) => p.id === id);
+  if (!existing) throw new Error("Data potensi tidak ditemukan.");
+  requireWilayah(session, existing.rtId);
+  validate(data);
+
+  const { data: rows, error } = await getSupabase()
+    .from("rt_potensi")
+    .update({ judul: data.judul.trim(), deskripsi: data.deskripsi.trim(), kategori: data.kategori })
+    .eq("id", id)
+    .select("id");
+  if (error) throw toUserError(error, "Potensi gagal disimpan.");
+  if (!rows || rows.length === 0) throw new Error("Potensi gagal disimpan. Periksa hak akses Anda.");
+
+  await potensiStore.refresh();
 }
 
-export function updatePotensiRT(id: string, data: Omit<RTPotensi, "id" | "rtId">): void {
-  saveStore(getStore().map((p) => (p.id === id ? { ...p, ...data } : p)));
-}
+export async function deletePotensiRT(id: string): Promise<void> {
+  const session = requireSession();
+  const existing = potensiStore.getState().items.find((p) => p.id === id);
+  if (!existing) return;
+  requireWilayah(session, existing.rtId);
 
-export function deletePotensiRT(id: string): void {
-  saveStore(getStore().filter((p) => p.id !== id));
+  const { data, error } = await getSupabase().from("rt_potensi").delete().eq("id", id).select("id");
+  if (error) throw toUserError(error, "Potensi gagal dihapus.");
+  if (!data || data.length === 0) throw new Error("Potensi gagal dihapus. Periksa hak akses Anda.");
+
+  await potensiStore.refresh();
 }
 
 export { type RTPotensi };

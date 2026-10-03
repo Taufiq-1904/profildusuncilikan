@@ -36,10 +36,10 @@ function BeritaList() {
     (a) => (status === "semua" || a.status === status) && (wilayah === "semua" || a.wilayahId === wilayah)
   );
 
-  function run(action: () => void) {
+  async function run(action: () => Promise<unknown>) {
     setError("");
     try {
-      action();
+      await action();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Tindakan gagal.");
     }

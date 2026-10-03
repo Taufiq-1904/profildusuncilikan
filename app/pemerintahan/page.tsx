@@ -5,8 +5,8 @@ import { PageHeader } from "@/components/sections/page-header";
 import { Breadcrumb } from "@/components/layout/breadcrumb";
 import { Container } from "@/components/layout/container";
 import { SectionHeading } from "@/components/sections/section-heading";
+import { KepalaDusunSection } from "@/components/sections/kepala-dusun-section";
 import { RTTabs } from "@/components/sections/rt-tabs";
-import { officials, villageHead } from "@/lib/data/officialsData";
 import { siteConfig } from "@/lib/data/siteConfig";
 
 export const metadata: Metadata = {
@@ -15,8 +15,6 @@ export const metadata: Metadata = {
 };
 
 export default function PemerintahanPage() {
-  const rtOfficials = officials.filter((o) => o.category === "rt");
-
   return (
     <>
       <PageHeader
@@ -26,33 +24,7 @@ export default function PemerintahanPage() {
       />
       <Breadcrumb items={[{ label: "Pemerintahan" }]} />
 
-      {/* Kepala Dusun */}
-      <section className="py-16 sm:py-20">
-        <Container>
-          <SectionHeading eyebrow="Pimpinan" title="Kepala Dusun Cilikan" className="mb-10" />
-          <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:gap-10">
-            {/* Avatar block */}
-            <div className="flex-shrink-0">
-              <div className="flex h-28 w-28 items-center justify-center rounded-2xl bg-brand-100 text-4xl font-bold text-brand-700 shadow-sm">
-                {villageHead.name.split(" ").slice(-1)[0].charAt(0)}
-              </div>
-            </div>
-            <div>
-              <p className="inline-block rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700">
-                {villageHead.position}
-              </p>
-              <h2 className="mt-2 font-display text-2xl font-semibold text-ink-900">{villageHead.name}</h2>
-              {villageHead.period && (
-                <p className="mt-1 text-sm text-ink-500">Masa jabatan: {villageHead.period}</p>
-              )}
-              <p className="mt-4 max-w-xl text-sm leading-relaxed text-ink-700">
-                Kepala Dusun Cilikan bertanggung jawab atas koordinasi kegiatan kemasyarakatan, pembinaan warga,
-                serta menjadi penghubung antara warga dusun dengan kelurahan dan instansi terkait.
-              </p>
-            </div>
-          </div>
-        </Container>
-      </section>
+      <KepalaDusunSection />
 
       {/* 4 Ketua RT */}
       <section className="bg-cream py-16 sm:py-20">
@@ -65,7 +37,7 @@ export default function PemerintahanPage() {
           <p className="mb-10 max-w-xl text-sm text-ink-500">
             Dusun Cilikan terdiri dari 4 Rukun Tetangga (RT). Klik tab untuk melihat detail masing-masing RT.
           </p>
-          <RTTabs officials={rtOfficials} />
+          <RTTabs />
         </Container>
       </section>
 

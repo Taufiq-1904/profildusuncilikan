@@ -4,14 +4,13 @@ import { useParams } from "next/navigation";
 import { Notice } from "@/components/dashboard/notice";
 import { UmkmEditor } from "@/components/dashboard/umkm-editor";
 import { useAuth } from "@/components/providers/auth-provider";
-import { useUmkm } from "@/lib/hooks/use-directory";
-import { useIsClient } from "@/lib/hooks/use-news";
+import { useUmkm, useUmkmReady } from "@/lib/hooks/use-directory";
 import { canManageUmkm, findUmkmById } from "@/lib/umkmService";
 
 export default function EditUmkmPage() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
-  const isClient = useIsClient();
+  const isClient = useUmkmReady();
   const all = useUmkm();
 
   if (!isClient) return null;

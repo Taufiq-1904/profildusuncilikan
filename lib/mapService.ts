@@ -1,34 +1,42 @@
 import { requireSession, requireWilayah } from "./access";
-import { validateLocation } from "./geo";
-import { createLocalStore } from "./localStore";
-import { initialPins, PIN_CATEGORIES, type MapPin } from "./data/mapData";
+import { PIN_CATEGORIES, type MapPin } from "./data/mapData";
 import { getWilayahLevel } from "./data/wilayahData";
-
-// Same storage key as before, so pins already saved in a browser are kept.
-export const pinStore = createLocalStore<MapPin>({
-  key: "cilikan_map_pins",
-  seed: initialPins,
-});
+import { rowToPin } from "./db/mappers";
+import { toUserError } from "./db/errors";
+import { validateLocation } from "./geo";
+import { removeMedia } from "./image-upload";
+import { createRemoteStore } from "./remoteStore";
+import { getSupabase } from "./supabase/client";
 
 export type PinInput = Omit<MapPin, "id" | "createdAt">;
 
-// Plain reads for code that is not subscribed to the store.
-export function getPins(): MapPin[] {
-  return pinStore.getSnapshot();
-}
-
-export function getPinsByCreator(creator: MapPin["createdBy"]): MapPin[] {
-  return getPins().filter((p) => p.createdBy === creator);
-}
-
-function clean(value?: string): string | undefined {
+function clean(value?: string): string | null {
   const v = value?.trim();
-  return v || undefined;
+  return v || null;
 }
 
-// `createdBy` is the wilayah that owns the pin, so it is also what decides who
-// may add or remove it.
-export function addPin(input: PinInput): MapPin {
+export async function getPins(): Promise<MapPin[]> {
+  const { data, error } = await getSupabase()
+    .from("map_pins")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (error) throw toUserError(error, "Gagal mengambil data lokasi.");
+  return (data ?? []).map(rowToPin);
+}
+
+export async function getPinsByCreator(creator: MapPin["createdBy"]): Promise<MapPin[]> {
+  const { data, error } = await getSupabase()
+    .from("map_pins")
+    .select("*")
+    .eq("wilayah_id", creator)
+    .order("created_at", { ascending: false });
+  if (error) throw toUserError(error, "Gagal mengambil data lokasi.");
+  return (data ?? []).map(rowToPin);
+}
+
+export const pinStore = createRemoteStore<MapPin>({ load: getPins });
+
+export async function addPin(input: PinInput): Promise<MapPin> {
   const session = requireSession();
   requireWilayah(session, input.createdBy);
 
@@ -39,27 +47,48 @@ export function addPin(input: PinInput): MapPin {
   if (input.lat === undefined || input.lng === undefined) throw new Error("Koordinat tidak valid.");
   validateLocation(input);
 
-  const pin: MapPin = {
-    ...input,
-    nama: input.nama.trim(),
-    deskripsi: input.deskripsi.trim(),
-    kontak: clean(input.kontak),
-    alamat: clean(input.alamat),
-    mapsUrl: clean(input.mapsUrl),
-    id: `pin-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-    createdAt: new Date().toISOString().slice(0, 10),
-  };
-  pinStore.write([...getPins(), pin]);
-  return pin;
+  const { data, error } = await getSupabase()
+    .from("map_pins")
+    .insert({
+      nama: input.nama.trim(),
+      deskripsi: input.deskripsi.trim(),
+      kategori: input.kategori,
+      lat: input.lat,
+      lng: input.lng,
+      kontak: clean(input.kontak),
+      alamat: clean(input.alamat),
+      foto: clean(input.foto),
+      maps_url: clean(input.mapsUrl),
+      wilayah_id: input.createdBy,
+    })
+    .select("*")
+    .single();
+  if (error || !data) throw toUserError(error ?? { message: "no data" }, "Lokasi gagal disimpan.");
+
+  await pinStore.refresh();
+  return rowToPin(data);
 }
 
-export function deletePin(id: string): void {
+export async function deletePin(id: string): Promise<void> {
   const session = requireSession();
-  const all = getPins();
-  const pin = all.find((p) => p.id === id);
-  if (!pin) return;
-  requireWilayah(session, pin.createdBy);
-  pinStore.write(all.filter((p) => p.id !== id));
+  const supabase = getSupabase();
+
+  const { data: existing, error: findError } = await supabase
+    .from("map_pins")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (findError) throw toUserError(findError, "Lokasi tidak ditemukan.");
+  if (!existing) return;
+
+  requireWilayah(session, existing.wilayah_id);
+
+  const { data, error } = await supabase.from("map_pins").delete().eq("id", id).select("id");
+  if (error) throw toUserError(error, "Lokasi gagal dihapus.");
+  if (!data || data.length === 0) throw new Error("Lokasi gagal dihapus. Periksa hak akses Anda.");
+
+  await removeMedia([existing.foto]);
+  await pinStore.refresh();
 }
 
 export type { MapPin };

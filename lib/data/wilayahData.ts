@@ -2,13 +2,9 @@
 // This intentionally stays as static in-memory data (no real DB yet — see
 // project notes), but the shape mirrors what a `dusun` / `rw` / `rt` table
 // set would look like, so it can be lifted into a real schema later without
-// reshaping the app. Never hardcode "if rw09 then rt01" logic elsewhere —
+// reshaping the app. Nama ketua sengaja TIDAK disimpan di sini: dibaca dari
+// struktur dusun (lihat useWilayahHeads di lib/hooks/use-directory.ts). Never hardcode "if rw09 then rt01" logic elsewhere —
 // always resolve relationships through rwId / getRTsByRW / getRWByRT below.
-
-export type KelompokUmur = {
-  label: string; // "0-4", "5-14", "15-24", "25-44", "45-59", "60+"
-  jumlah: number;
-};
 
 export type Dusun = {
   id: "dusun";
@@ -18,23 +14,14 @@ export type Dusun = {
 export type RW = {
   id: string; // "rw09"
   label: string; // "RW 09"
-  ketua?: string;
 };
 
 export type RT = {
   id: string; // "rt01"
   label: string; // "RT 01"
   rwId: string; // foreign key -> RW.id
-  ketua: string;
-  sekretaris?: string;
-  bendahara?: string;
-  // Aggregate population statistics only (no individual resident registry —
-  // that was removed together with the finance feature; see project notes).
-  jumlahWarga: number;
-  jumlahKK: number;
-  jumlahLaki: number;
-  jumlahPerempuan: number;
-  kelompokUmur: KelompokUmur[];
+  // Angka kependudukan tidak disimpan di sini: ada di tabel rt_demografi
+  // (lihat lib/data/demografiData.ts).
 };
 
 export const dusun: Dusun = {
@@ -43,83 +30,15 @@ export const dusun: Dusun = {
 };
 
 export const rwList: RW[] = [
-  { id: "rw09", label: "RW 09", ketua: "Sukendar" },
-  { id: "rw10", label: "RW 10", ketua: "Halim" },
+  { id: "rw09", label: "RW 09" },
+  { id: "rw10", label: "RW 10" },
 ];
 
 export const rtList: RT[] = [
-  {
-    id: "rt01",
-    label: "RT 01",
-    rwId: "rw09",
-    ketua: "Bayu K",
-    jumlahWarga: 124,
-    jumlahKK: 36,
-    jumlahLaki: 63,
-    jumlahPerempuan: 61,
-    kelompokUmur: [
-      { label: "0–4", jumlah: 8 },
-      { label: "5–14", jumlah: 18 },
-      { label: "15–24", jumlah: 22 },
-      { label: "25–44", jumlah: 42 },
-      { label: "45–59", jumlah: 24 },
-      { label: "60+", jumlah: 10 },
-    ],
-  },
-  {
-    id: "rt02",
-    label: "RT 02",
-    rwId: "rw09",
-    ketua: "Ilham",
-    jumlahWarga: 131,
-    jumlahKK: 38,
-    jumlahLaki: 67,
-    jumlahPerempuan: 64,
-    kelompokUmur: [
-      { label: "0–4", jumlah: 10 },
-      { label: "5–14", jumlah: 20 },
-      { label: "15–24", jumlah: 25 },
-      { label: "25–44", jumlah: 45 },
-      { label: "45–59", jumlah: 21 },
-      { label: "60+", jumlah: 10 },
-    ],
-  },
-  {
-    id: "rt03",
-    label: "RT 03",
-    rwId: "rw10",
-    ketua: "Darsono",
-    jumlahWarga: 118,
-    jumlahKK: 34,
-    jumlahLaki: 60,
-    jumlahPerempuan: 58,
-    kelompokUmur: [
-      { label: "0–4", jumlah: 7 },
-      { label: "5–14", jumlah: 16 },
-      { label: "15–24", jumlah: 19 },
-      { label: "25–44", jumlah: 38 },
-      { label: "45–59", jumlah: 25 },
-      { label: "60+", jumlah: 13 },
-    ],
-  },
-  {
-    id: "rt04",
-    label: "RT 04",
-    rwId: "rw10",
-    ketua: "Suyadi",
-    jumlahWarga: 114,
-    jumlahKK: 34,
-    jumlahLaki: 58,
-    jumlahPerempuan: 56,
-    kelompokUmur: [
-      { label: "0–4", jumlah: 6 },
-      { label: "5–14", jumlah: 15 },
-      { label: "15–24", jumlah: 20 },
-      { label: "25–44", jumlah: 36 },
-      { label: "45–59", jumlah: 24 },
-      { label: "60+", jumlah: 13 },
-    ],
-  },
+  { id: "rt01", label: "RT 01", rwId: "rw09" },
+  { id: "rt02", label: "RT 02", rwId: "rw09" },
+  { id: "rt03", label: "RT 03", rwId: "rw10" },
+  { id: "rt04", label: "RT 04", rwId: "rw10" },
 ];
 
 export function getRWById(id: string): RW | undefined {
@@ -194,6 +113,11 @@ export function getWilayahFilterOptions(ownerIds: string[]): WilayahFilterOption
       if (a.level !== b.level) return a.level === "rw" ? -1 : 1;
       return a.label.localeCompare(b.label, "id");
     });
+}
+
+// Sebutan jabatan kepala wilayah: "Dukuh", "Ketua RW 09", "Ketua RT 01".
+export function getHeadTitle(id: string): string {
+  return id === dusun.id ? "Dukuh" : `Ketua ${getWilayahLabel(id)}`;
 }
 
 // "RT 03 · RW 10" for places that belong to an RT.

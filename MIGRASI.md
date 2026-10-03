@@ -11,9 +11,9 @@ Urutan kerja yang aman. Kerjakan berurutan, jangan loncat.
 | **Supabase** | Database + login pengelola + penyimpanan gambar | belum, data masih `localStorage` |
 | **Domain** | Alamat `dusuncilikan.web.id` | belum |
 
-**Penting:** saat ini berita/UMKM/dll tersimpan di `localStorage`, artinya hanya terlihat di browser
-si pengisi. Kata sandi akun juga tertulis di `lib/data/authData.ts`, sehingga ikut terkirim ke browser
-semua pengunjung. **Jangan umumkan website ke warga sebelum Tahap 4 (login Supabase) selesai.**
+**Status kode:** seluruh data (berita, UMKM, organisasi, struktur dusun, pin peta, potensi RT, kependudukan per RT),
+login pengelola, dan gambar sudah memakai Supabase. Tidak ada lagi yang disimpan di `localStorage`,
+dan kata sandi tidak lagi ada di kode. Yang perlu kamu lakukan hanya menyiapkan project Supabase (Tahap 3-5 di bawah).
 
 ---
 
@@ -42,46 +42,76 @@ semua pengunjung. **Jangan umumkan website ke warga sebelum Tahap 4 (login Supab
 
 ## Tahap 3 — Siapkan Supabase
 
-1. Daftar di supabase.com → **New project**. Pilih region terdekat (**Southeast Asia / Singapore**),
-   simpan *database password* di tempat aman.
-2. Buka **SQL Editor → New query**, tempel seluruh isi `supabase/schema.sql`, klik **Run**.
-   Ini membuat tabel wilayah, berita, UMKM, organisasi, struktur dusun, pin peta, aturan hak akses (RLS),
-   dan bucket gambar `media`.
-3. Ambil kunci di **Project Settings → API** (atau tombol **Connect**):
+1. Daftar di supabase.com → **New project**. Pilih region **Southeast Asia (Singapore)**, simpan *database password*.
+2. **SQL Editor → New query**, tempel seluruh isi `supabase/schema.sql`, klik **Run**.
+   Membuat tabel, aturan hak akses (RLS), fungsi login username, dan bucket gambar `media`.
+3. (Opsional) Jalankan `supabase/seed.sql` untuk memasukkan data contoh (berita, organisasi, struktur dusun, 1 pin).
+   Lewati bila ingin mulai kosong.
+4. Ambil kunci di **Project Settings → API**:
    - **Project URL** → `NEXT_PUBLIC_SUPABASE_URL`
    - **Publishable key** (`sb_publishable_...`) → `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
-   - Jangan pakai atau membagikan `secret`/`service_role` key di kode browser.
-4. Lokal: salin `.env.example` jadi `.env.local`, isi nilainya.
-5. Vercel: **Project → Settings → Environment Variables**, tambahkan tiga variabel yang sama
-   (termasuk `NEXT_PUBLIC_SITE_URL`), lalu **Redeploy**.
+   - **Secret / service_role key** → `SUPABASE_SERVICE_ROLE_KEY` (rahasia, hanya di server/Vercel,
+     tanpa awalan `NEXT_PUBLIC_`; dipakai hanya untuk fitur "Atur ulang password akun").
+5. Lokal: salin `.env.example` jadi `.env.local`, isi nilainya. Vercel: tambahkan variabel yang sama, lalu **Redeploy**.
 
-## Tahap 4 — Pindahkan login ke Supabase Auth
+## Tahap 4 — Buat akun pengelola
 
-1. **Authentication → Users → Add user** untuk tiap akun (admin, rw09, rw10, rt01–rt04).
-   Supabase memakai email. Pakai email pengurus, atau email alias per akun. Centang *Auto Confirm User*.
-2. Salin UUID tiap user, lalu daftarkan profilnya (contoh ada di bagian paling bawah `schema.sql`):
+1. **Authentication → Users → Add user** untuk tiap akun (admin, rw09, rw10, rt01–rt04), isi email dan password
+   yang kuat, centang *Auto Confirm User*. Email boleh alias (mis. `rt01@dusuncilikan.web.id`); warga tidak melihatnya,
+   pengelola login memakai **username**.
+2. Salin UUID tiap user, lalu jalankan di SQL Editor (ganti UUID):
    ```sql
-   insert into public.profiles (id, display_name, role, wilayah_id) values
-     ('UUID-ADMIN', 'Admin Dusun Cilikan', 'dusun', 'dusun');
+   insert into public.profiles (id, username, display_name, role, wilayah_id) values
+     ('UUID-ADMIN', 'admin', 'Admin Dusun Cilikan', 'dusun', 'dusun'),
+     ('UUID-RW09',  'rw09',  'Ketua RW 09',        'rw',    'rw09'),
+     ('UUID-RW10',  'rw10',  'Ketua RW 10',        'rw',    'rw10'),
+     ('UUID-RT01',  'rt01',  'Ketua RT 01',        'rt',    'rt01'),
+     ('UUID-RT02',  'rt02',  'Ketua RT 02',        'rt',    'rt02'),
+     ('UUID-RT03',  'rt03',  'Ketua RT 03',        'rt',    'rt03'),
+     ('UUID-RT04',  'rt04',  'Ketua RT 04',        'rt',    'rt04');
    ```
-3. Kode login perlu diganti dari `lib/auth.ts` (localStorage) ke `supabase.auth.signInWithPassword`,
-   plus file `proxy.ts` untuk menyegarkan sesi (di Next.js 16 namanya `proxy.ts`, bukan `middleware.ts`).
-4. Setelah ini, hapus `lib/data/authData.ts` supaya kata sandi lama tidak lagi ada di kode.
+3. Di **Authentication → URL Configuration** isi *Site URL* dengan domain final.
 
-## Tahap 5 — Pindahkan data per modul
+## Catatan: struktur per wilayah dan ganti periode
 
-Semua akses data sudah lewat `lib/*Service.ts`, jadi UI tidak perlu berubah. Satu modul per langkah,
-tes dulu, baru lanjut:
+Nama dukuh, ketua RW, dan ketua RT **tidak ada di kode**. Semuanya ada di tabel `dusun_officials`
+(Dashboard > Struktur). Setiap baris dimiliki satu wilayah (`owner_id`):
 
-1. Struktur dusun (`dusunOfficialService.ts`) — paling sederhana
-2. Berita (`newsService.ts`)
-3. UMKM (`umkmService.ts`)
-4. Organisasi (`organizationService.ts`)
-5. Pin peta (`mapService.ts`)
-6. Gambar: ganti data URL jadi unggah ke bucket `media` (`lib/image-upload.ts`), simpan URL-nya.
-   Tambahkan host Supabase ke `images.remotePatterns` di `next.config.ts` bila memakai `next/image`.
+| Akun | Boleh mengisi struktur |
+|---|---|
+| Dusun | dusun (dan semua RW/RT) |
+| RW | RW-nya + RT di bawahnya |
+| RT | RT-nya saja |
 
-Data contoh (seed) di `lib/data/*` dimasukkan ke tabel sekali saja lewat SQL atau Table Editor.
+Aturan ini dijalankan di database (RLS), bukan hanya disembunyikan di tampilan.
+
+- **Database baru:** `schema.sql` (+ `seed.sql` bila mau data contoh) sudah lengkap.
+- **Database yang sudah berisi data:** jalankan sekali `supabase/migrasi-ketua-wilayah.sql`.
+  Skrip itu memindahkan ketua RW/RT dan pendampingnya ("Ibu Ketua ...") ke struktur wilayah masing-masing
+  dan menandai kepalanya. Hasil cek di akhir skrip harus 7 baris; bila kurang, tandai sisanya lewat Edit.
+- **Ganti periode:** login > Struktur > pilih wilayah > Edit pada jabatannya > ganti Nama dan Periode > Simpan.
+  Centang "Ini Dukuh / Ketua RT 01 / ..." menandai orang tersebut sebagai kepala wilayahnya; beranda, halaman
+  Pemerintahan, tabel RT, dan dashboard membaca namanya dari situ.
+- Sekretaris/Bendahara RT diambil dari baris di struktur RT yang jabatannya diawali "Sekretaris" / "Bendahara".
+- Ketua Kelompok Tani/Kandang di halaman Potensi diambil dari kolom Ketua pada Dashboard > Organisasi.
+
+---
+
+## Tahap 5 — Cara kerja penyimpanan (untuk referensi)
+
+| Data | Tabel | Siapa yang boleh mengubah |
+|---|---|---|
+| Berita | `news` | Pengelola wilayahnya (draft hanya terlihat pengelola) |
+| UMKM | `umkm` | Pengelola RT-nya (nonaktif hanya terlihat pengelola) |
+| Organisasi | `organizations` | Pengelola wilayahnya |
+| Struktur dusun | `dusun_officials` | Akun Dusun |
+| Pin peta | `map_pins` | Pengelola wilayahnya |
+| Potensi RT | `rt_potensi` | Pengelola RT-nya |
+| Kependudukan (jumlah laki-laki, perempuan, KK, kelompok usia) | `rt_demografi` | Pengelola RT-nya (RW dan Dusun juga bisa) |
+| Gambar | Storage bucket `media` | Pengelola yang login |
+
+Aturan akses dijalankan di database (RLS), jadi akun RT tidak bisa mengubah data RT/RW lain walau
+memanipulasi browser. Gambar diunggah ke bucket `media` dan yang disimpan di tabel hanya URL-nya.
 
 ## Tahap 6 — Beli dan sambungkan domain `dusuncilikan.web.id`
 
@@ -114,7 +144,7 @@ Data contoh (seed) di `lib/data/*` dimasukkan ke tabel sekali saja lewat SQL ata
 
 ## Checklist sebelum diumumkan
 
-- [ ] Login Supabase aktif, `authData.ts` sudah dihapus
+- [ ] Semua akun pengelola sudah dibuat + didaftarkan di `profiles`, login dengan username berhasil
 - [ ] Data tersimpan di Supabase (buka dari HP lain, datanya sama)
 - [ ] Coba login sebagai akun RT: tidak bisa mengubah data RT/RW lain
 - [ ] Gambar tersimpan di Supabase Storage, bukan data URL

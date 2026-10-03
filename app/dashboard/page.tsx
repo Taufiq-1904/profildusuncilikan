@@ -1,22 +1,36 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import Link from "next/link";
 import { Users, Home, Store, Sparkles, ArrowRight } from "lucide-react";
+import { AGE_GROUPS, sumDemografi, totalWarga } from "@/lib/data/demografiData";
 import { rtList as allRT, getRTsByRW, type RT } from "@/lib/data/wilayahData";
-import { getUMKMByRT } from "@/lib/umkmService";
-import { getPotensiByRT } from "@/lib/potensiService";
+import { selectUmkmByRT } from "@/lib/umkmService";
+import { selectPotensiByRT } from "@/lib/potensiService";
+import {
+  useDemografi,
+  useDemografiReady,
+  useWilayahHeads,
+  usePotensi,
+  usePotensiReady,
+  useUmkm,
+  useUmkmReady,
+} from "@/lib/hooks/use-directory";
 import { DonutChart } from "@/components/ui/donut-chart";
 import { BarChart } from "@/components/ui/bar-chart";
 import { useAuth } from "@/components/providers/auth-provider";
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const allUmkm = useUmkm();
+  const allPotensi = usePotensi();
+  // Angka UMKM/potensi tampil "–" sampai datanya selesai dimuat dari Supabase.
+  const umkmReady = useUmkmReady();
+  const potensiReady = usePotensiReady();
+  const demografi = useDemografi();
+  const demografiReady = useDemografiReady();
+  const { headOf } = useWilayahHeads();
+  const mounted = umkmReady && potensiReady && demografiReady;
 
   // Scope the RTs shown by role: dusun sees everything, an RW account sees
   // its own RTs, an RT account sees only itself.
@@ -27,23 +41,14 @@ export default function DashboardPage() {
     return allRT.filter((rt) => rt.id === user.wilayahId);
   }, [user]);
 
-  const totalWarga = scopedRT.reduce((acc, rt) => acc + rt.jumlahWarga, 0);
-  const totalKK = scopedRT.reduce((acc, rt) => acc + rt.jumlahKK, 0);
-  const totalLaki = scopedRT.reduce((acc, rt) => acc + rt.jumlahLaki, 0);
-  const totalPerempuan = scopedRT.reduce((acc, rt) => acc + rt.jumlahPerempuan, 0);
-  const totalUMKM = mounted ? scopedRT.reduce((acc, rt) => acc + getUMKMByRT(rt.id).length, 0) : 0;
-  const totalPotensi = mounted ? scopedRT.reduce((acc, rt) => acc + getPotensiByRT(rt.id).length, 0) : 0;
-
-  const ageMap: Record<string, number> = { "0–4": 0, "5–14": 0, "15–24": 0, "25–44": 0, "45–59": 0, "60+": 0 };
-  scopedRT.forEach((rt) => {
-    rt.kelompokUmur.forEach((k) => {
-      ageMap[k.label] = (ageMap[k.label] ?? 0) + k.jumlah;
-    });
-  });
+  const scopedDemografi = demografi.filter((d) => scopedRT.some((rt) => rt.id === d.rtId));
+  const total = sumDemografi(scopedDemografi);
+  const totalUMKM = scopedRT.reduce((acc, rt) => acc + selectUmkmByRT(allUmkm, rt.id).length, 0);
+  const totalPotensi = scopedRT.reduce((acc, rt) => acc + selectPotensiByRT(allPotensi, rt.id).length, 0);
 
   const statCards = [
-    { label: "Total Penduduk", value: `${totalWarga} jiwa`, icon: Users, color: "text-brand-700 bg-brand-50" },
-    { label: "Jumlah KK", value: `${totalKK} KK`, icon: Home, color: "text-amber-700 bg-amber-50" },
+    { label: "Total Penduduk", value: `${total.warga} jiwa`, icon: Users, color: "text-brand-700 bg-brand-50" },
+    { label: "Jumlah KK", value: `${total.kk} KK`, icon: Home, color: "text-amber-700 bg-amber-50" },
     { label: "Total UMKM", value: `${totalUMKM} Usaha`, icon: Store, color: "text-teal-700 bg-teal-50" },
     { label: "Total Potensi", value: `${totalPotensi} Data`, icon: Sparkles, color: "text-purple-700 bg-purple-50" },
   ];
@@ -86,18 +91,21 @@ export default function DashboardPage() {
             size={170}
             strokeWidth={32}
             centerLabel="penduduk"
-            centerValue={totalWarga}
+            centerValue={total.warga}
             segments={[
-              { label: "Laki-laki", value: totalLaki, color: "#0891b2" },
-              { label: "Perempuan", value: totalPerempuan, color: "#ec4899" },
+              { label: "Laki-laki", value: total.laki, color: "#0891b2" },
+              { label: "Perempuan", value: total.perempuan, color: "#ec4899" },
             ]}
           />
+          {mounted && total.warga === 0 && (
+            <p className="text-sm text-ink-500">Data kependudukan belum diisi.</p>
+          )}
         </div>
 
         <div className="rounded-2xl border border-line bg-paper p-6 shadow-sm">
           <h2 className="mb-5 font-display text-base font-semibold text-ink-900">Sebaran Usia Penduduk</h2>
           <BarChart
-            bars={Object.entries(ageMap).map(([label, value]) => ({ label, value }))}
+            bars={AGE_GROUPS.map((label, i) => ({ label, value: total.umur[i] }))}
             height={170}
             barColor="#16a34a"
             unit=" jiwa"
@@ -114,7 +122,9 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {scopedRT.map((rt) => (
+        {scopedRT.map((rt) => {
+          const d = demografi.find((x) => x.rtId === rt.id);
+          return (
           <Link
             key={rt.id}
             href={`/dashboard/rt/${rt.id}`}
@@ -126,29 +136,30 @@ export default function DashboardPage() {
               </span>
               <ArrowRight className="h-4 w-4 text-ink-300 transition-transform group-hover:translate-x-1 group-hover:text-brand-600" />
             </div>
-            <p className="text-sm font-semibold text-ink-900">{rt.ketua}</p>
+            <p className="text-sm font-semibold text-ink-900">{headOf(rt.id)?.name ?? "Belum diisi"}</p>
             <p className="text-xs text-ink-500 mb-3">Ketua RT</p>
 
             <div className="space-y-1.5 border-t border-line pt-3 text-xs text-ink-600">
               <div className="flex justify-between">
                 <span>Penduduk:</span>
-                <span className="font-semibold text-ink-900">{rt.jumlahWarga} jiwa</span>
+                <span className="font-semibold text-ink-900">{mounted && d ? `${totalWarga(d)} jiwa` : "–"}</span>
               </div>
               <div className="flex justify-between">
                 <span>Kepala Keluarga:</span>
-                <span className="font-semibold text-ink-900">{rt.jumlahKK} KK</span>
+                <span className="font-semibold text-ink-900">{mounted && d ? `${d.jumlahKK} KK` : "–"}</span>
               </div>
               <div className="flex justify-between">
                 <span>UMKM Terdaftar:</span>
-                <span className="font-semibold text-amber-700">{mounted ? getUMKMByRT(rt.id).length : "–"} Usaha</span>
+                <span className="font-semibold text-amber-700">{mounted ? selectUmkmByRT(allUmkm, rt.id).length : "–"} Usaha</span>
               </div>
               <div className="flex justify-between">
                 <span>Potensi RT:</span>
-                <span className="font-semibold text-purple-700">{mounted ? getPotensiByRT(rt.id).length : "–"} Data</span>
+                <span className="font-semibold text-purple-700">{mounted ? selectPotensiByRT(allPotensi, rt.id).length : "–"} Data</span>
               </div>
             </div>
           </Link>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

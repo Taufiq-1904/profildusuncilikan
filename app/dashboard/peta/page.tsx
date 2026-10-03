@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { MapPin, Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { errorClass } from "@/components/dashboard/form-styles";
 import { PlaceGlyph } from "@/components/map/marker-icons";
 import { PlaceMapView } from "@/components/map/place-map-view";
@@ -18,8 +18,12 @@ import { cn } from "@/lib/utils";
 export default function AdminPetaPage() {
   const { user } = useAuth();
   const router = useRouter();
-  const pins = usePins();
-  const places = useMemo(() => pins.map(pinToPlace), [pins]);
+  const { pins, refresh } = usePins();
+
+  const places = useMemo(
+    () => pins.map(pinToPlace),
+    [pins]
+  );
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState("");
@@ -31,19 +35,33 @@ export default function AdminPetaPage() {
   }, [user, router]);
 
   // Errors are thrown on purpose: the modal shows them and stays open.
-  function handleAddPin(data: PinFormData) {
-    addPin({ ...data, createdBy: user!.wilayahId });
-    setAdding(false);
-  }
-
-  function handleDeletePin(id: string) {
-    if (!confirm("Hapus lokasi ini?")) return;
+  async function handleAddPin(data: PinFormData) {
     setError("");
     try {
-      deletePin(id);
+      await addPin({
+        ...data,
+        createdBy: user!.wilayahId,
+      });
+
+      await refresh();
+      setAdding(false);
+    } catch (e) {
+      console.error(e);
+      setError(e instanceof Error ? e.message : "Gagal menambahkan lokasi.");
+    }
+  }
+
+  async function handleDeletePin(id: string) {
+    if (!confirm("Hapus lokasi ini?")) return;
+
+    setError("");
+    try {
+      await deletePin(id);
+      await refresh();
       setSelectedId(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Lokasi gagal dihapus.");
+      console.error(e);
+      setError(e instanceof Error ? e.message : "Gagal menghapus lokasi.");
     }
   }
 

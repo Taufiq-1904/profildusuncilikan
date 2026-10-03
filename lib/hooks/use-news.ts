@@ -1,17 +1,25 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import { getNewsSnapshot, getServerNewsSnapshot, subscribeNews } from "@/lib/newsService";
+import { newsStore } from "@/lib/newsService";
 
+function useNewsState() {
+  return useSyncExternalStore(newsStore.subscribe, newsStore.getState, newsStore.getServerState);
+}
+
+// Daftar berita dari Supabase. Kosong sampai pemuatan pertama selesai; pakai
+// useNewsReady() bila perlu membedakan "belum dimuat" dari "memang tidak ada".
 export function useNews() {
-  return useSyncExternalStore(subscribeNews, getNewsSnapshot, getServerNewsSnapshot);
+  return useNewsState().items;
+}
+
+export function useNewsReady(): boolean {
+  return useNewsState().ready;
 }
 
 const noopSubscribe = () => () => {};
 
-// False during server render and hydration, true afterwards. Anything that
-// depends on localStorage (a slug that may only exist in the browser, form
-// defaults) waits for this instead of rendering from the seed data first.
+// False during server render and hydration, true afterwards.
 export function useIsClient(): boolean {
   return useSyncExternalStore(
     noopSubscribe,
