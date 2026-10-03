@@ -1,0 +1,265 @@
+@import "tailwindcss";
+
+:root {
+  /* === PRIMARY — Forest Green (refreshed, more vibrant) === */
+  --brand-950: #052e16;
+  --brand-900: #14532d;
+  --brand-800: #166534;
+  --brand-700: #15803d;
+  --brand-600: #16a34a;
+  --brand-500: #22c55e;
+  --brand-400: #4ade80;
+  --brand-100: #dcfce7;
+  --brand-50: #f0fdf4;
+
+  /* === TEAL — accent for interactive/info elements === */
+  --teal-700: #0e7490;
+  --teal-600: #0891b2;
+  --teal-500: #06b6d4;
+  --teal-400: #22d3ee;
+  --teal-100: #cffafe;
+  --teal-50:  #ecfeff;
+
+  /* === AMBER — warm accent replacing gold === */
+  --amber-700: #b45309;
+  --amber-600: #d97706;
+  --amber-500: #f59e0b;
+  --amber-400: #fbbf24;
+  --amber-100: #fef3c7;
+  --amber-50:  #fffbeb;
+
+  /* === NEUTRAL SURFACES === */
+  --cream:    #f8fafc;
+  --cream-100:#f1f5f9;
+  --paper:    #ffffff;
+
+  /* === INK === */
+  --ink-900: #0f172a;
+  --ink-700: #334155;
+  --ink-500: #64748b;
+  --ink-300: #cbd5e1;
+  --line:    #e2e8f0;
+
+  --background: var(--paper);
+  --foreground: var(--ink-900);
+
+  /* === TYPOGRAPHY === */
+  --font-fraunces: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Noto Serif", serif;
+  --font-jakarta: "Inter", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --color-brand-950: var(--brand-950);
+  --color-brand-900: var(--brand-900);
+  --color-brand-800: var(--brand-800);
+  --color-brand-700: var(--brand-700);
+  --color-brand-600: var(--brand-600);
+  --color-brand-500: var(--brand-500);
+  --color-brand-400: var(--brand-400);
+  --color-brand-100: var(--brand-100);
+  --color-brand-50:  var(--brand-50);
+
+  --color-teal-700: var(--teal-700);
+  --color-teal-600: var(--teal-600);
+  --color-teal-500: var(--teal-500);
+  --color-teal-400: var(--teal-400);
+  --color-teal-100: var(--teal-100);
+  --color-teal-50:  var(--teal-50);
+
+  --color-amber-700: var(--amber-700);
+  --color-amber-600: var(--amber-600);
+  --color-amber-500: var(--amber-500);
+  --color-amber-400: var(--amber-400);
+  --color-amber-100: var(--amber-100);
+  --color-amber-50:  var(--amber-50);
+
+  /* Legacy gold aliases for compatibility */
+  --color-gold-600: var(--amber-700);
+  --color-gold-500: var(--amber-600);
+  --color-gold-400: var(--amber-500);
+  --color-gold-100: var(--amber-100);
+
+  --color-cream:     var(--cream);
+  --color-cream-100: var(--cream-100);
+  --color-paper:     var(--paper);
+
+  --color-ink-900: var(--ink-900);
+  --color-ink-700: var(--ink-700);
+  --color-ink-500: var(--ink-500);
+  --color-ink-300: var(--ink-300);
+  --color-line:    var(--line);
+
+  --font-display: var(--font-fraunces);
+  --font-sans:    var(--font-jakarta);
+
+  --animate-fade-up:   fade-up 0.6s ease-out both;
+  --animate-fade-in:   fade-in 0.5s ease-out both;
+  --animate-slide-in:  slide-in 0.5s ease-out both;
+}
+
+/* === ANIMATIONS === */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes slide-in {
+  from { opacity: 0; transform: translateX(-12px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes terrace {
+  from { stroke-dashoffset: 1200; }
+  to   { stroke-dashoffset: 0; }
+}
+
+/* === BASE === */
+* { border-color: var(--line); }
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}
+
+h1, h2, h3, h4, .font-display {
+  font-family: var(--font-display);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+::selection {
+  background: var(--amber-400);
+  color: var(--brand-950);
+}
+
+.text-balance { text-wrap: balance; }
+
+/* Terrace divider motif */
+.terrace-divider path {
+  stroke-dasharray: 1200;
+  stroke-dashoffset: 1200;
+  animation: terrace 1.6s ease-out forwards;
+}
+
+/* === GRADIENT UTILITIES === */
+.hero-gradient {
+  background: linear-gradient(
+    135deg,
+    var(--brand-950) 0%,
+    #0c4a2e 40%,
+    #0e4f5c 75%,
+    #0c3460 100%
+  );
+}
+
+.section-gradient {
+  background: linear-gradient(
+    180deg,
+    var(--brand-50) 0%,
+    var(--teal-50) 100%
+  );
+}
+
+.card-gradient {
+  background: linear-gradient(
+    135deg,
+    var(--brand-50) 0%,
+    var(--teal-50) 100%
+  );
+}
+
+/* === MAP === */
+/* Leaflet's own stylesheet is imported by components/map/place-map.tsx, so it
+   only ships with pages that actually show a map. These are our overrides. */
+.leaflet-container {
+  font-family: inherit;
+  background: var(--brand-50);
+}
+
+.leaflet-container.is-picking,
+.leaflet-container.is-picking .leaflet-interactive {
+  cursor: crosshair;
+}
+
+.leaflet-bar {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgb(15 23 42 / 0.12);
+}
+
+.leaflet-bar a {
+  color: var(--ink-700);
+}
+
+.leaflet-control-attribution {
+  font-size: 10px;
+  background: rgb(255 255 255 / 0.85);
+}
+
+/* Markers: a round, colour-coded badge with a glyph inside. Leaflet positions
+   .map-marker with a transform, so scale effects go on the inner .map-pin. No
+   infinite animation and no SVG filters: with many markers those forced
+   constant repaints. */
+.map-marker {
+  background: none;
+  border: 0;
+}
+
+.map-pin {
+  display: flex;
+  height: 36px;
+  width: 36px;
+  align-items: center;
+  justify-content: center;
+  border: 3px solid #fff;
+  border-radius: 9999px;
+  background: var(--pin);
+  color: #fff;
+  box-shadow: 0 2px 6px rgb(15 23 42 / 0.35);
+  transition: transform 150ms ease, box-shadow 150ms ease;
+}
+
+.map-pin svg {
+  height: 18px;
+  width: 18px;
+}
+
+.map-marker:hover .map-pin {
+  transform: scale(1.12);
+}
+
+.map-marker:focus-visible {
+  outline: none;
+}
+
+.map-marker:focus-visible .map-pin {
+  box-shadow: 0 0 0 3px #fff, 0 0 0 6px var(--ink-900);
+}
+
+.map-marker.is-selected .map-pin {
+  transform: scale(1.22);
+  box-shadow: 0 0 0 3px #fff, 0 0 0 6px var(--pin), 0 4px 10px rgb(15 23 42 / 0.4);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .map-pin {
+    transition: none;
+  }
+}
