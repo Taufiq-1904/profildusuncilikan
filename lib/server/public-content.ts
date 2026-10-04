@@ -1,7 +1,8 @@
 import { createPublicClient } from "@/lib/supabase/public";
-import { rowToNews, rowToOrganization, rowToUmkm } from "@/lib/db/mappers";
+import { rowToNews, rowToOrganization, rowToPotensi, rowToUmkm } from "@/lib/db/mappers";
 import type { NewsArticle } from "@/lib/data/newsData";
 import type { Organization } from "@/lib/data/organizationData";
+import type { RTPotensi } from "@/lib/data/potensiData";
 import type { UMKM } from "@/lib/data/umkmData";
 
 // Pembacaan konten PUBLIK di server (metadata SEO, JSON-LD, sitemap).
@@ -87,4 +88,33 @@ export async function getOrganizationBySlug(slug: string): Promise<Organization 
     return undefined;
   }
   return data ? rowToOrganization(data) : undefined;
+}
+
+export async function getAllPotensi(): Promise<RTPotensi[]> {
+  const supabase = createPublicClient();
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from("rt_potensi")
+    .select("*")
+    .order("created_at", { ascending: true });
+  if (error) {
+    console.error("Gagal memuat potensi (server):", error);
+    return [];
+  }
+  return (data ?? []).map(rowToPotensi);
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export async function getPotensiById(id: string): Promise<RTPotensi | undefined> {
+  // Id yang bukan UUID pasti tidak ada; hindari galat sintaks dari Postgres.
+  if (!UUID.test(id)) return undefined;
+  const supabase = createPublicClient();
+  if (!supabase) return undefined;
+  const { data, error } = await supabase.from("rt_potensi").select("*").eq("id", id).maybeSingle();
+  if (error) {
+    console.error("Gagal memuat potensi (server):", error);
+    return undefined;
+  }
+  return data ? rowToPotensi(data) : undefined;
 }

@@ -118,7 +118,7 @@ app/
 ├── pemerintahan/page.tsx    # Struktur pemerintahan & perangkat desa
 ├── potensi/
 │   ├── page.tsx             # Daftar potensi desa
-│   └── [slug]/page.tsx      # Detail potensi
+│   └── [id]/page.tsx        # Detail potensi
 ├── berita/
 │   ├── page.tsx             # Daftar berita (search, filter, pagination)
 │   └── [slug]/page.tsx      # Detail berita
@@ -135,7 +135,7 @@ components/
 └── ui/        # Button, Badge, Card, ImagePlaceholder
 
 lib/
-├── data/      # Semua dummy data (siteConfig, villageData, officialsData, potentialsData, newsData, galleryData)
+├── data/      # Semua dummy data (siteConfig, villageData, officialsData, newsData, galleryData)
 ├── icon-map.tsx  # Pemetaan nama ikon -> komponen Lucide
 └── utils.ts      # Helper cn() dan formatDate()
 
@@ -187,7 +187,7 @@ Halaman daftar (`/berita`), homepage, halaman detail (`/berita/[slug]`), dan `si
 
 ## Cara Menambahkan Potensi Dusun
 
-Edit `lib/data/potentialsData.ts`, tambahkan object baru ke array `potentials` mengikuti tipe `Potential`. Field `icon` menggunakan nama ikon yang terdaftar di `lib/icon-map.tsx` (tambahkan mapping baru di sana bila perlu ikon lain dari Lucide).
+Potensi tidak ditulis di kode. Pengelola menambahkannya lewat Dashboard > pilih RT > tab **Potensi RT** > **Tambah Potensi** (judul, kategori, deskripsi). Datanya tersimpan di tabel `rt_potensi` dan langsung tampil di beranda, halaman `/potensi`, dan halaman detailnya. Bila belum ada data, bagian potensi di beranda disembunyikan dan halaman `/potensi` menampilkan keterangan kosong.
 
 ## Deployment ke Vercel
 

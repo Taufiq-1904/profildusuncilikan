@@ -1,11 +1,21 @@
+"use client";
+
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { Container } from "@/components/layout/container";
 import { SectionHeading } from "./section-heading";
 import { PotentialCard } from "@/components/cards/potential-card";
-import { potentials } from "@/lib/data/potentialsData";
+import { usePotensi } from "@/lib/hooks/use-directory";
 
 export function PotentialsSection() {
+  const potensi = usePotensi();
+
+  // Bagian ini hanya tampil bila pengelola sudah menginput potensi.
+  if (potensi.length === 0) return null;
+
+  // Potensi terbaru lebih dulu; store mengurutkan dari yang paling lama.
+  const latest = [...potensi].reverse().slice(0, 4);
+
   return (
     <section className="bg-brand-50/60 py-20 sm:py-28">
       <Container>
@@ -13,7 +23,7 @@ export function PotentialsSection() {
           <SectionHeading
             eyebrow="Potensi Unggulan"
             title="Kekayaan Cilikan yang Terus Bertumbuh"
-            description="Dari sawah subur hingga kerajinan tangan, inilah sektor-sektor yang menopang kehidupan warga Cilikan."
+            description="Potensi yang dikelola dan dicatat langsung oleh pengurus RT, RW, dan dusun."
           />
           <Link
             href="/potensi"
@@ -25,8 +35,8 @@ export function PotentialsSection() {
         </div>
 
         <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          {potentials.slice(0, 4).map((potential) => (
-            <PotentialCard key={potential.slug} potential={potential} />
+          {latest.map((potential) => (
+            <PotentialCard key={potential.id} potential={potential} />
           ))}
         </div>
 

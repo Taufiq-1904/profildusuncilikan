@@ -93,7 +93,7 @@ Aturan ini dijalankan di database (RLS), bukan hanya disembunyikan di tampilan.
   Centang "Ini Dukuh / Ketua RT 01 / ..." menandai orang tersebut sebagai kepala wilayahnya; beranda, halaman
   Pemerintahan, tabel RT, dan dashboard membaca namanya dari situ.
 - Sekretaris/Bendahara RT diambil dari baris di struktur RT yang jabatannya diawali "Sekretaris" / "Bendahara".
-- Ketua Kelompok Tani/Kandang di halaman Potensi diambil dari kolom Ketua pada Dashboard > Organisasi.
+- Potensi di beranda dan halaman Potensi diambil dari data yang diinput di Dashboard > RT > Potensi RT (tabel `rt_potensi`).
 
 ---
 

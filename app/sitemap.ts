@@ -1,18 +1,18 @@
 import { SITE_URL } from "@/lib/site-url";
 import type { MetadataRoute } from "next";
-import { potentials } from "@/lib/data/potentialsData";
-import { getActiveUmkm, getAllOrganizations, getPublishedNews } from "@/lib/server/public-content";
+import { getActiveUmkm, getAllOrganizations, getAllPotensi, getPublishedNews } from "@/lib/server/public-content";
 
 const baseUrl = SITE_URL;
 
-// Daftar berita/UMKM/organisasi dibaca dari Supabase; dihitung ulang tiap jam.
+// Daftar berita/UMKM/organisasi/potensi dibaca dari Supabase; dihitung ulang tiap jam.
 export const revalidate = 3600;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [news, organizations, umkm] = await Promise.all([
+  const [news, organizations, umkm, potensi] = await Promise.all([
     getPublishedNews(),
     getAllOrganizations(),
     getActiveUmkm(),
+    getAllPotensi(),
   ]);
 
   const staticRoutes = [
@@ -34,8 +34,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: path === "" ? 1 : 0.8,
   }));
 
-  const potensiRoutes = potentials.map((p) => ({
-    url: `${baseUrl}/potensi/${p.slug}`,
+  const potensiRoutes = potensi.map((p) => ({
+    url: `${baseUrl}/potensi/${p.id}`,
     lastModified: new Date(),
     changeFrequency: "monthly" as const,
     priority: 0.6,
