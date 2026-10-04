@@ -2,27 +2,33 @@
 
 import { Quote } from "lucide-react";
 import { Container } from "@/components/layout/container";
-import { ImagePlaceholder } from "@/components/ui/image-placeholder";
-import { headWelcome } from "@/lib/data/officialsData";
+import { useSiteSettings } from "@/components/providers/site-settings-provider";
+import { MediaImage } from "@/components/ui/media-image";
 import { useWilayahHeads } from "@/lib/hooks/use-directory";
 
 export function HeadWelcomeSection() {
+  const { settings } = useSiteSettings();
   const { headOf, ready } = useWilayahHeads();
   const head = headOf("dusun");
 
-  // Nama dan jabatan dibaca dari Dashboard > Struktur (kepala wilayah "dusun").
+  // Nama, jabatan, periode, dan foto dibaca dari Dashboard > Struktur (kepala
+  // wilayah "dusun"); isi sambutan dari Dashboard > Beranda & Profil.
   const name = head?.name ?? (ready ? "Dukuh Cilikan" : "…");
   const position = head?.position ?? "Dukuh";
+
+  if (!settings.welcomeMessage) return null;
 
   return (
     <section className="bg-cream py-20 sm:py-28">
       <Container>
         <div className="grid items-center gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:gap-16">
           <div className="relative mx-auto w-full max-w-xs">
-            <ImagePlaceholder
-              tone="green"
+            <MediaImage
+              src={head?.photo}
+              alt={name}
               icon="users"
-              label={name}
+              tone="green"
+              sizes="320px"
               className="aspect-[4/5] w-full rounded-3xl"
             />
             <div className="absolute -bottom-5 left-1/2 w-[85%] -translate-x-1/2 rounded-2xl border border-line bg-paper px-5 py-3 text-center shadow-md">
@@ -34,7 +40,7 @@ export function HeadWelcomeSection() {
           <div className="pt-6 lg:pt-0">
             <Quote className="h-9 w-9 text-gold-500" strokeWidth={1.5} />
             <p className="mt-4 text-balance font-display text-xl leading-relaxed text-ink-900 sm:text-2xl">
-              {headWelcome.message}
+              {settings.welcomeMessage}
             </p>
             <div className="mt-7 h-px w-16 bg-gold-500" />
             <p className="mt-4 font-display text-base font-semibold text-brand-800">{name}</p>

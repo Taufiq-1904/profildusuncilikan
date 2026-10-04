@@ -17,6 +17,8 @@ import {
   X,
   KeyRound,
   Globe,
+  PanelsTopLeft,
+  Images,
 } from "lucide-react";
 import { useAuth } from "@/components/providers/auth-provider";
 import { rwList, getRTsByRW, getRWById } from "@/lib/data/wilayahData";
@@ -41,6 +43,9 @@ const navItems: NavItem[] = [
   // Struktur: tiap akun mengisi bagan wilayahnya sendiri. Peta dusun khusus akun Dusun.
   { href: "/dashboard/struktur", label: "Struktur", icon: Network },
   { href: "/dashboard/peta", label: "Peta Dusun", icon: Map, dusunOnly: true },
+  // Konten situs (beranda, profil, kontak) dan foto galeri: khusus akun Dusun.
+  { href: "/dashboard/beranda", label: "Beranda & Profil", icon: PanelsTopLeft, dusunOnly: true },
+  { href: "/dashboard/galeri", label: "Galeri", icon: Images, dusunOnly: true },
   { href: "/dashboard/akun", label: "Akun & Password", icon: KeyRound },
 ];
 

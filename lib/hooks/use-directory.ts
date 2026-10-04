@@ -6,6 +6,7 @@ import { findByPosition, findWilayahHead } from "@/lib/data/dusunOfficialsData";
 import type { RemoteStore } from "@/lib/remoteStore";
 import { demografiStore } from "@/lib/demografiService";
 import { dusunOfficialStore } from "@/lib/dusunOfficialService";
+import { galleryStore } from "@/lib/galleryService";
 import { buildMapPlaces } from "@/lib/mapPlaces";
 import { pinStore } from "@/lib/mapService";
 import { organizationStore } from "@/lib/organizationService";
@@ -53,6 +54,13 @@ export function useWilayahHeads() {
     }),
     [state.items, state.ready]
   );
+}
+
+export function useGallery() {
+  return useStore(galleryStore).items;
+}
+export function useGalleryReady() {
+  return useStore(galleryStore).ready;
 }
 
 export function useDemografi() {

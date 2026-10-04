@@ -5,8 +5,8 @@ export function Timeline({
 }) {
   return (
     <ol className="relative border-l border-line pl-8">
-      {items.map((item) => (
-        <li key={item.year} className="mb-10 last:mb-0">
+      {items.map((item, i) => (
+        <li key={`${i}-${item.year}`} className="mb-10 last:mb-0">
           <span className="absolute -left-[9px] mt-1.5 flex h-4 w-4 items-center justify-center rounded-full border-2 border-paper bg-gold-500" />
           <span className="text-xs font-semibold uppercase tracking-wide text-brand-600">
             {item.year}

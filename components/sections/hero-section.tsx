@@ -1,14 +1,23 @@
+"use client";
+
 import Link from "next/link";
 import { ArrowRight, MapPinned, Map } from "lucide-react";
 import { Container } from "@/components/layout/container";
+import { useSiteSettings } from "@/components/providers/site-settings-provider";
+import { DEFAULT_HERO_IMAGE } from "@/lib/data/siteSettingsData";
 import { siteConfig } from "@/lib/data/siteConfig";
+import { safeExternalUrl } from "@/lib/links";
 
 export function HeroSection() {
+  const { settings } = useSiteSettings();
+  // Foto hero diunggah Dukuh; bila belum ada, pakai gambar bawaan situs.
+  const background = safeExternalUrl(settings.heroImage) ?? DEFAULT_HERO_IMAGE;
+
   return (
     <section
       className="relative isolate flex min-h-[92vh] items-end overflow-hidden bg-brand-950 bg-cover bg-center pb-20 pt-40 sm:min-h-[85vh]"
       style={{
-        backgroundImage: `url(${siteConfig.heroBackground})`,
+        backgroundImage: `url("${background}")`,
       }}
     >
       <div
@@ -28,12 +37,16 @@ export function HeroSection() {
           <h1 className="mt-6 text-balance font-display text-4xl font-semibold leading-[1.08] text-white sm:text-5xl lg:text-6xl">
             {siteConfig.villageName}
           </h1>
-          <p className="mt-3 font-display text-lg italic text-amber-400 sm:text-xl">
-            &ldquo;{siteConfig.tagline}&rdquo;
-          </p>
-          <p className="mt-5 max-w-lg text-base leading-relaxed text-white/75 sm:text-lg">
-            {siteConfig.shortDescription}
-          </p>
+          {settings.tagline && (
+            <p className="mt-3 font-display text-lg italic text-amber-400 sm:text-xl">
+              &ldquo;{settings.tagline}&rdquo;
+            </p>
+          )}
+          {settings.shortDescription && (
+            <p className="mt-5 max-w-lg text-base leading-relaxed text-white/75 sm:text-lg">
+              {settings.shortDescription}
+            </p>
+          )}
 
           <div className="mt-9 flex flex-wrap gap-3">
             <Link

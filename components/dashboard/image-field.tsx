@@ -12,8 +12,8 @@ const addTileClass =
 
 // Gambar dikecilkan lalu diunggah ke Supabase Storage; yang dikembalikan
 // adalah URL publiknya (bukan data URL), jadi database tetap ringan.
-async function readImage(file: File, maxWidth: number): Promise<string> {
-  return uploadImage(file, "umum", maxWidth, 0.78);
+async function readImage(file: File, maxWidth: number, folder: string): Promise<string> {
+  return uploadImage(file, folder, maxWidth, 0.78);
 }
 
 export function ImageField({
@@ -24,6 +24,7 @@ export function ImageField({
   maxWidth = 800,
   aspectClass = "aspect-square",
   hint,
+  folder = "umum",
 }: {
   label: string;
   value?: string;
@@ -32,13 +33,15 @@ export function ImageField({
   maxWidth?: number;
   aspectClass?: string;
   hint?: string;
+  // Folder di bucket "media". Folder "situs" hanya boleh ditulis akun Dusun.
+  folder?: string;
 }) {
   const input = useRef<HTMLInputElement>(null);
 
   async function handle(file: File | undefined) {
     if (!file) return;
     try {
-      onChange(await readImage(file, maxWidth));
+      onChange(await readImage(file, maxWidth, folder));
     } catch (e) {
       onError(e instanceof Error ? e.message : "Gagal memproses gambar.");
     }
@@ -85,12 +88,16 @@ export function GalleryField({
   onChange,
   onError,
   max,
+  folder = "umum",
+  maxWidth = 900,
 }: {
   label: string;
   values: string[];
   onChange: (values: string[]) => void;
   onError: (message: string) => void;
   max: number;
+  folder?: string;
+  maxWidth?: number;
 }) {
   const input = useRef<HTMLInputElement>(null);
 
@@ -103,7 +110,7 @@ export function GalleryField({
         break;
       }
       try {
-        next.push(await readImage(file, 900));
+        next.push(await readImage(file, maxWidth, folder));
       } catch (e) {
         onError(e instanceof Error ? e.message : "Gagal memproses gambar.");
       }

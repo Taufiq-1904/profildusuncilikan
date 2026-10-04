@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
 import { GalleryCard } from "@/components/cards/gallery-card";
-import { ImagePlaceholder } from "@/components/ui/image-placeholder";
+import { MediaImage } from "@/components/ui/media-image";
 import type { GalleryItem } from "@/lib/data/galleryData";
 
 export function GalleryGrid({ items }: { items: GalleryItem[] }) {
@@ -62,11 +62,14 @@ export function GalleryGrid({ items }: { items: GalleryItem[] }) {
             className="w-full max-w-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <ImagePlaceholder
-              tone={active.imageTone}
+            <MediaImage
+              src={active.image}
+              alt={active.title}
               icon="package"
-              label={active.title}
-              className="aspect-[4/3] w-full rounded-2xl"
+              fit="contain"
+              priority
+              sizes="(min-width: 768px) 672px, 100vw"
+              className="aspect-[4/3] w-full rounded-2xl bg-black/20"
             />
             <div className="mt-4 text-center text-white">
               <p className="text-xs font-semibold uppercase tracking-wide text-gold-300">

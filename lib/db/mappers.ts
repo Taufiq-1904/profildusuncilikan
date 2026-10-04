@@ -4,10 +4,17 @@
 
 import { AGE_GROUPS, type Demografi } from "../data/demografiData";
 import type { DusunOfficial } from "../data/dusunOfficialsData";
+import type { GalleryItem, GallerySpan } from "../data/galleryData";
 import type { MapPin } from "../data/mapData";
 import type { NewsArticle } from "../data/newsData";
 import type { Organization } from "../data/organizationData";
 import type { RTPotensi } from "../data/potensiData";
+import {
+  defaultSiteSettings,
+  type SiteSettings,
+  type SiteSettingsResult,
+  type TimelineEntry,
+} from "../data/siteSettingsData";
 import type { UMKM } from "../data/umkmData";
 
 type Row = Record<string, any>;
@@ -140,5 +147,85 @@ export function rowToDemografi(r: Row): Demografi {
     laki: Number(r.laki),
     perempuan: Number(r.perempuan),
     kelompokUmur: AGE_GROUPS.map((_, i) => Number(umur[i] ?? 0)),
+  };
+}
+
+// --- Konten situs -------------------------------------------------------------
+
+// Kolom yang belum pernah disimpan (null) memakai isi bawaan; kolom yang sengaja
+// dikosongkan Dukuh (teks "" atau daftar []) tetap kosong.
+const text = (v: unknown, fallback: string): string => (typeof v === "string" ? v : fallback);
+
+const textList = (v: unknown, fallback: string[]): string[] =>
+  Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : fallback;
+
+const timelineList = (v: unknown, fallback: TimelineEntry[]): TimelineEntry[] => {
+  if (!Array.isArray(v)) return fallback;
+  return v
+    .filter((x): x is Row => typeof x === "object" && x !== null)
+    .map((x) => ({
+      year: text(x.year, ""),
+      title: text(x.title, ""),
+      description: text(x.description, ""),
+    }));
+};
+
+const num = (v: unknown, fallback: number | undefined): number | undefined =>
+  typeof v === "number" && Number.isFinite(v) ? v : fallback;
+
+export function rowToSiteSettings(r: Row | null | undefined): SiteSettingsResult {
+  const d = defaultSiteSettings;
+  if (!r) return { settings: d, stored: false };
+  const settings: SiteSettings = {
+    tagline: text(r.tagline, d.tagline),
+    shortDescription: text(r.short_description, d.shortDescription),
+    heroImage: text(r.hero_image, d.heroImage),
+    welcomeMessage: text(r.welcome_message, d.welcomeMessage),
+    locationNote: text(r.location_note, d.locationNote),
+    aboutPhotos: textList(r.about_photos, d.aboutPhotos),
+    excellence: textList(r.excellence, d.excellence),
+
+    historySummary: text(r.history_summary, d.historySummary),
+    timeline: timelineList(r.timeline, d.timeline),
+    vision: text(r.vision, d.vision),
+    missions: textList(r.missions, d.missions),
+
+    geoArea: text(r.geo_area, d.geoArea),
+    geoAltitude: text(r.geo_altitude, d.geoAltitude),
+    geoClimate: text(r.geo_climate, d.geoClimate),
+    geoNorth: text(r.geo_north, d.geoNorth),
+    geoSouth: text(r.geo_south, d.geoSouth),
+    geoEast: text(r.geo_east, d.geoEast),
+    geoWest: text(r.geo_west, d.geoWest),
+    geoTopography: text(r.geo_topography, d.geoTopography),
+
+    address: text(r.address, d.address),
+    phone: text(r.phone, d.phone),
+    whatsapp: text(r.whatsapp, d.whatsapp),
+    email: text(r.email, d.email),
+    serviceHours: text(r.service_hours, d.serviceHours),
+    mapsUrl: text(r.maps_url, d.mapsUrl),
+    lat: num(r.lat, d.lat),
+    lng: num(r.lng, d.lng),
+    instagram: text(r.instagram, d.instagram),
+    facebook: text(r.facebook, d.facebook),
+    youtube: text(r.youtube, d.youtube),
+    kalurahanAddress: text(r.kalurahan_address, d.kalurahanAddress),
+    kalurahanPhone: text(r.kalurahan_phone, d.kalurahanPhone),
+  };
+  return { settings, stored: true };
+}
+
+export function rowToGalleryPhoto(r: Row): GalleryItem {
+  const span: GallerySpan = r.span === "tall" || r.span === "wide" ? r.span : "normal";
+  return {
+    id: r.id,
+    title: r.title,
+    category: r.category,
+    image: r.image,
+    span,
+    order: Number(r.sort_order ?? 0),
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
   };
 }

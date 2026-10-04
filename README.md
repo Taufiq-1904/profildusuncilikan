@@ -38,6 +38,8 @@ Wilayah didefinisikan relasional di `lib/data/wilayahData.ts` (`rwList`, `rtList
 | Organisasi & komunitas | `lib/organizationService.ts` | `/organisasi`, `/organisasi/[slug]` | `/dashboard/organisasi` |
 | UMKM | `lib/umkmService.ts` | `/umkm`, `/umkm/[slug]` | `/dashboard/umkm` |
 | Struktur organisasi dusun | `lib/dusunOfficialService.ts` | `/profil/struktur` | `/dashboard/struktur` (hanya Dusun) |
+| Konten situs (beranda, profil, geografis, kontak) | `lib/siteSettingsService.ts` | `/`, `/profil`, `/kontak`, footer | `/dashboard/beranda` (hanya Dusun) |
+| Galeri | `lib/galleryService.ts` | `/galeri`, beranda | `/dashboard/galeri` (hanya Dusun) |
 
 Struktur kepengurusan organisasi bersifat **opsional**: organisasi boleh hanya berupa profil. Bagan struktur dusun bersifat data-driven (baris = `tier`, urutan = `order`), tanpa data yang ditulis langsung di komponen.
 

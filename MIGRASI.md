@@ -97,6 +97,24 @@ Aturan ini dijalankan di database (RLS), bukan hanya disembunyikan di tampilan.
 
 ---
 
+## Catatan: konten beranda, profil, kontak, dan galeri (khusus Dukuh)
+
+Teks beranda, sambutan, sejarah, visi-misi, kondisi geografis, kontak, media sosial, dan foto (latar beranda,
+foto "Tentang Dusun", galeri) **tidak ada di kode**. Semuanya diubah akun **Dusun** lewat
+**Dashboard > Beranda & Profil** dan **Dashboard > Galeri**. Akun RW/RT tidak melihat menu itu, dan database
+menolak tulisan dari mereka (RLS `is_dusun()`, termasuk unggahan ke folder `situs` di Storage).
+
+- **Database yang sudah berisi data:** jalankan sekali `supabase/migrasi-konten-situs.sql`.
+- **Database baru:** `schema.sql` sudah termasuk (bagian 9).
+- Sebelum Dukuh menyimpan apa pun, situs memakai **isi bawaan** (`lib/data/siteSettingsData.ts`), jadi tidak ada
+  halaman kosong. Setelah tombol **Simpan semua** ditekan, nilai dari database yang dipakai.
+- Kolom yang dikosongkan tidak ditampilkan (kartu kontak, batas wilayah, sambutan, galeri di beranda), jadi tidak ada
+  tombol mati atau tulisan "Data menyusul".
+- Nomor telepon, WhatsApp, email, dan media sosial **sengaja kosong** sampai Dukuh mengisinya (isi lama hanya contoh).
+- Isi bawaan geografis (luas 6,62 km², ketinggian ± 275 m, curah hujan ± 2.225 mm/tahun, batas kalurahan) adalah
+  angka **tingkat Kalurahan Umbulmartani** dari Peraturan Bupati Sleman No. 86 Tahun 2025 dan website kalurahan.
+  Titik lokasi bawaan hanya perkiraan Balai Padukuhan; konfirmasi lewat peta di tab Kontak.
+
 ## Tahap 5 — Cara kerja penyimpanan (untuk referensi)
 
 | Data | Tabel | Siapa yang boleh mengubah |

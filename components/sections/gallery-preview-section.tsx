@@ -1,11 +1,19 @@
+"use client";
+
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { Container } from "@/components/layout/container";
-import { SectionHeading } from "./section-heading";
+import { useGallery, useGalleryReady } from "@/lib/hooks/use-directory";
 import { GalleryGrid } from "./gallery-grid";
-import { galleryItems } from "@/lib/data/galleryData";
+import { SectionHeading } from "./section-heading";
 
 export function GalleryPreviewSection() {
+  const items = useGallery();
+  const ready = useGalleryReady();
+
+  // Belum ada foto yang diunggah: bagian ini disembunyikan, bukan diisi kotak kosong.
+  if (!ready || items.length === 0) return null;
+
   return (
     <section className="bg-cream py-20 sm:py-28">
       <Container>
@@ -25,7 +33,7 @@ export function GalleryPreviewSection() {
         </div>
 
         <div className="mt-10">
-          <GalleryGrid items={galleryItems.slice(0, 8)} />
+          <GalleryGrid items={items.slice(0, 8)} />
         </div>
 
         <Link
