@@ -226,7 +226,7 @@ function SettingsEditor({ initial }: { initial: SiteSettings }) {
                 folder="situs"
                 maxWidth={1920}
                 aspectClass="aspect-video"
-                hint="Foto lanskap (mendatar) paling bagus. Kosong = gambar bawaan situs."
+                hint="Dipakai di beranda dan sebagai latar header semua halaman. Foto lanskap (mendatar) paling bagus. Kosong = gambar bawaan situs."
               />
             </div>
           </section>

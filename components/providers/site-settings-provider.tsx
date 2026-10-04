@@ -1,7 +1,8 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import type { SiteSettings, SiteSettingsResult } from "@/lib/data/siteSettingsData";
+import { DEFAULT_HERO_IMAGE, type SiteSettings, type SiteSettingsResult } from "@/lib/data/siteSettingsData";
+import { safeExternalUrl } from "@/lib/links";
 import { fetchSiteSettings } from "@/lib/siteSettingsService";
 
 type SiteSettingsContextType = {
@@ -55,4 +56,12 @@ export function useSiteSettings(): SiteSettingsContextType {
   const ctx = useContext(SiteSettingsContext);
   if (!ctx) throw new Error("useSiteSettings must be used within SiteSettingsProvider");
   return ctx;
+}
+
+// Satu foto latar untuk beranda dan header semua halaman, supaya keduanya
+// selalu sama. Diunggah Dukuh di Dashboard > Beranda & Profil; bila belum ada,
+// dipakai gambar bawaan situs.
+export function useHeroImage(): string {
+  const { settings } = useSiteSettings();
+  return safeExternalUrl(settings.heroImage) ?? DEFAULT_HERO_IMAGE;
 }

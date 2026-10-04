@@ -3,15 +3,13 @@
 import Link from "next/link";
 import { ArrowRight, MapPinned, Map } from "lucide-react";
 import { Container } from "@/components/layout/container";
-import { useSiteSettings } from "@/components/providers/site-settings-provider";
-import { DEFAULT_HERO_IMAGE } from "@/lib/data/siteSettingsData";
+import { useHeroImage, useSiteSettings } from "@/components/providers/site-settings-provider";
 import { siteConfig } from "@/lib/data/siteConfig";
-import { safeExternalUrl } from "@/lib/links";
 
 export function HeroSection() {
   const { settings } = useSiteSettings();
-  // Foto hero diunggah Dukuh; bila belum ada, pakai gambar bawaan situs.
-  const background = safeExternalUrl(settings.heroImage) ?? DEFAULT_HERO_IMAGE;
+  // Foto yang sama juga dipakai header semua halaman (PageHeader).
+  const background = useHeroImage();
 
   return (
     <section
