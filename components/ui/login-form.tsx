@@ -1,10 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Eye, EyeOff, Lock, User } from "lucide-react";
 import { useAuth } from "@/components/providers/auth-provider";
+import { IDLE_NOTICE_KEY } from "@/lib/hooks/use-idle-timeout";
+
+const noSubscription = () => () => {};
+
+function wasLoggedOutByIdle(): boolean {
+  try {
+    return sessionStorage.getItem(IDLE_NOTICE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
 
 export function LoginForm() {
   const { signIn } = useAuth();
@@ -14,6 +25,9 @@ export function LoginForm() {
   const [showPass, setShowPass] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  // Di server selalu false; di browser dibaca dari sessionStorage tanpa memicu
+  // ketidakcocokan hidrasi. Penanda dihapus saat pengguna berhasil masuk lagi.
+  const idleNotice = useSyncExternalStore(noSubscription, wasLoggedOutByIdle, () => false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -47,6 +61,12 @@ export function LoginForm() {
           Khusus pengelola Dusun Cilikan (Dusun, RW, atau RT)
         </p>
       </div>
+
+      {idleNotice && (
+        <div role="status" className="mb-4 rounded-xl border border-gold-400/40 bg-gold-100 px-4 py-3 text-sm text-ink-700">
+          Anda keluar otomatis karena tidak ada aktivitas selama 10 menit. Silakan masuk kembali.
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
