@@ -136,6 +136,7 @@ export function rowToPotensi(r: Row): RTPotensi {
     deskripsi: r.deskripsi ?? "",
     kategori: r.kategori,
     rtId: r.rt_id,
+    foto: opt(r.foto),
   };
 }
 

@@ -15,6 +15,8 @@ export type RTPotensi = {
   deskripsi: string;
   kategori: RTPotensiKategori;
   rtId: string;
+  // URL publik di Supabase Storage (bucket media). Kosong = tampil placeholder.
+  foto?: string;
 };
 
 type Tone = "green" | "gold" | "sky" | "clay";

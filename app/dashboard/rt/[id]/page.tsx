@@ -24,6 +24,7 @@ import { DonutChart } from "@/components/ui/donut-chart";
 import { BarChart } from "@/components/ui/bar-chart";
 import { DemografiForm } from "@/components/dashboard/demografi-form";
 import { AddPotensiModal } from "@/components/ui/add-potensi-modal";
+import { MediaImage } from "@/components/ui/media-image";
 import { useAuth } from "@/components/providers/auth-provider";
 import { canManageWilayah } from "@/lib/auth";
 
@@ -112,14 +113,22 @@ export default function RTDetailPage() {
 
         <div className="mt-3 flex flex-wrap gap-3">
           {[
-            { peran: "Ketua", nama: headOf(rt.id)?.name ?? "Belum diisi" },
-            { peran: "Sekretaris", nama: roleOf(rt.id, "sekretaris")?.name ?? "–" },
-            { peran: "Bendahara", nama: roleOf(rt.id, "bendahara")?.name ?? "–" },
+            { peran: "Ketua", person: headOf(rt.id), newQuery: "ketua=1" },
+            { peran: "Sekretaris", person: roleOf(rt.id, "sekretaris"), newQuery: "jabatan=Sekretaris" },
+            { peran: "Bendahara", person: roleOf(rt.id, "bendahara"), newQuery: "jabatan=Bendahara" },
           ].map((p) => (
             <div key={p.peran} className="flex items-center gap-2 rounded-full border border-line bg-paper px-3 py-1.5">
               <User className="h-3.5 w-3.5 text-ink-400" />
               <span className="text-xs text-ink-500">{p.peran}:</span>
-              <span className="text-xs font-semibold text-ink-800">{p.nama}</span>
+              <span className="text-xs font-semibold text-ink-800">{p.person?.name ?? "Belum diisi"}</span>
+              {canManage && (
+                <Link
+                  href={`/dashboard/struktur?wilayah=${rt.id}&${p.person ? `edit=${p.person.id}` : p.newQuery}`}
+                  className="text-xs font-semibold text-brand-700 hover:text-brand-800"
+                >
+                  {p.person ? "Ubah" : "Isi"}
+                </Link>
+              )}
             </div>
           ))}
         </div>
@@ -348,6 +357,9 @@ export default function RTDetailPage() {
               return (
                 <div key={p.id} className="rounded-2xl border bg-paper p-5 shadow-sm hover:shadow-md transition-all"
                   style={{ borderColor: color + "40" }}>
+                  {p.foto && (
+                    <MediaImage src={p.foto} alt={p.judul} sizes="360px" className="mb-4 aspect-[16/9] w-full rounded-xl" />
+                  )}
                   <div className="mb-3 flex items-start justify-between gap-2">
                     <div>
                       <span className="inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold text-white mb-2"

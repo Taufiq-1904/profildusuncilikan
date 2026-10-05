@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ImagePlaceholder } from "@/components/ui/image-placeholder";
+import { MediaImage } from "@/components/ui/media-image";
 import { getPotensiVisual, type RTPotensi } from "@/lib/data/potensiData";
 import { getRTWithRWLabel } from "@/lib/data/wilayahData";
 
@@ -12,10 +12,12 @@ export function PotentialCard({ potential }: { potential: RTPotensi }) {
   return (
     <Card className="group flex flex-col overflow-hidden hover:shadow-md">
       <Link href={`/potensi/${potential.id}`} className="flex h-full flex-col">
-        <ImagePlaceholder
+        <MediaImage
+          src={potential.foto}
+          alt={potential.judul}
           tone={visual.tone}
           icon={visual.icon}
-          label={potential.judul}
+          sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw"
           className="aspect-[4/3] w-full"
         />
         <div className="flex flex-1 flex-col p-5">

@@ -10,9 +10,9 @@ import { PotentialCard } from "@/components/cards/potential-card";
 import { useAuth } from "@/components/providers/auth-provider";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { ImagePlaceholder } from "@/components/ui/image-placeholder";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { ManageBar } from "@/components/ui/manage-bar";
+import { MediaImage } from "@/components/ui/media-image";
 import { canManageWilayah } from "@/lib/auth";
 import { getPotensiVisual } from "@/lib/data/potensiData";
 import { getRTWithRWLabel } from "@/lib/data/wilayahData";
@@ -53,10 +53,13 @@ export function PotensiDetail({ id }: { id: string }) {
         <Container>
           <div className="grid gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:gap-14">
             <div>
-              <ImagePlaceholder
+              <MediaImage
+                src={potential.foto}
+                alt={potential.judul}
                 tone={visual.tone}
                 icon={visual.icon}
-                label={potential.judul}
+                priority
+                sizes="(min-width: 1024px) 55vw, 100vw"
                 className="aspect-[4/3] w-full rounded-3xl"
               />
 

@@ -8,11 +8,23 @@ import { cn } from "@/lib/utils";
 import { errorClass, fieldClass, hintClass, labelClass, panelClass, primaryButtonClass, secondaryButtonClass } from "./form-styles";
 import { ImageField } from "./image-field";
 
+// Jabatan yang dipakai situs untuk mengisi kolom pengurus di halaman RT.
+// Pencocokannya dari awal teks jabatan, jadi tulisan "Sekretaris RT 01" terbaca.
+const QUICK_POSITIONS = ["Sekretaris", "Bendahara"];
+
+function positionFor(wanted: string | undefined, ownerId: string, isHead: boolean): string {
+  if (isHead) return getHeadTitle(ownerId);
+  if (!wanted) return "";
+  return `${wanted} ${getWilayahLabel(ownerId)}`;
+}
+
 // Add/edit form for one person on the dusun chart. The parent gives it a
 // `key`, so switching between people always starts from a clean state.
 export function OfficialForm({
   ownerId,
   official,
+  defaultPosition,
+  defaultHead = false,
   defaultTier,
   defaultOrder,
   onDone,
@@ -20,15 +32,17 @@ export function OfficialForm({
   // Wilayah pemilik struktur yang sedang diisi ("dusun", "rw09", "rt01").
   ownerId: string;
   official?: DusunOfficial;
+  defaultPosition?: string;
+  defaultHead?: boolean;
   defaultTier: number;
   defaultOrder: number;
   onDone: () => void;
 }) {
   const { user } = useAuth();
   const [name, setName] = useState(official?.name ?? "");
-  const [position, setPosition] = useState(official?.position ?? "");
+  const [position, setPosition] = useState(official?.position ?? positionFor(defaultPosition, ownerId, defaultHead));
   const [period, setPeriod] = useState(official?.period ?? "");
-  const [isHead, setIsHead] = useState(Boolean(official?.wilayahId));
+  const [isHead, setIsHead] = useState(official ? Boolean(official.wilayahId) : defaultHead);
   const [tier, setTier] = useState(String(official?.tier ?? defaultTier));
   const [order, setOrder] = useState(String(official?.order ?? defaultOrder));
   const [photo, setPhoto] = useState(official?.photo);
@@ -72,7 +86,23 @@ export function OfficialForm({
           </div>
           <div>
             <label htmlFor="off-position" className={labelClass}>Jabatan</label>
-            <input id="off-position" type="text" value={position} onChange={(e) => setPosition(e.target.value)} placeholder="Contoh: Sekretaris Dusun" className={fieldClass} />
+            <input id="off-position" type="text" value={position} onChange={(e) => setPosition(e.target.value)} placeholder="Contoh: Sekretaris RT 01" className={fieldClass} />
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <span className="text-xs text-ink-500">Isi cepat:</span>
+              {QUICK_POSITIONS.map((q) => (
+                <button
+                  key={q}
+                  type="button"
+                  onClick={() => setPosition(positionFor(q, ownerId, false))}
+                  className="rounded-full border border-line px-3 py-1 text-xs font-semibold text-ink-700 transition-colors hover:bg-brand-50 hover:text-brand-700"
+                >
+                  {q}
+                </button>
+              ))}
+            </div>
+            <p className={hintClass}>
+              Awali jabatan dengan kata Sekretaris atau Bendahara agar namanya tampil di kolom pengurus halaman RT.
+            </p>
           </div>
           <div>
             <label htmlFor="off-period" className={labelClass}>Periode <span className="font-normal text-ink-500">(opsional)</span></label>

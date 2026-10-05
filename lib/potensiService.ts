@@ -2,6 +2,7 @@ import { requireSession, requireWilayah } from "./access";
 import { type RTPotensi } from "./data/potensiData";
 import { rowToPotensi } from "./db/mappers";
 import { toUserError } from "./db/errors";
+import { droppedMedia, removeMedia } from "./image-upload";
 import { createRemoteStore } from "./remoteStore";
 import { getSupabase } from "./supabase/client";
 
@@ -37,6 +38,7 @@ export async function addPotensiRT(rtId: string, potensi: PotensiInput): Promise
       judul: potensi.judul.trim(),
       deskripsi: potensi.deskripsi.trim(),
       kategori: potensi.kategori,
+      foto: potensi.foto ?? null,
     })
     .select("*")
     .single();
@@ -55,12 +57,18 @@ export async function updatePotensiRT(id: string, data: PotensiInput): Promise<v
 
   const { data: rows, error } = await getSupabase()
     .from("rt_potensi")
-    .update({ judul: data.judul.trim(), deskripsi: data.deskripsi.trim(), kategori: data.kategori })
+    .update({
+      judul: data.judul.trim(),
+      deskripsi: data.deskripsi.trim(),
+      kategori: data.kategori,
+      foto: data.foto ?? null,
+    })
     .eq("id", id)
     .select("id");
   if (error) throw toUserError(error, "Potensi gagal disimpan.");
   if (!rows || rows.length === 0) throw new Error("Potensi gagal disimpan. Periksa hak akses Anda.");
 
+  await removeMedia(droppedMedia([existing.foto], [data.foto]));
   await potensiStore.refresh();
 }
 
@@ -74,6 +82,7 @@ export async function deletePotensiRT(id: string): Promise<void> {
   if (error) throw toUserError(error, "Potensi gagal dihapus.");
   if (!data || data.length === 0) throw new Error("Potensi gagal dihapus. Periksa hak akses Anda.");
 
+  await removeMedia([existing.foto]);
   await potensiStore.refresh();
 }
 

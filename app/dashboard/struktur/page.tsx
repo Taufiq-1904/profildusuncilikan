@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { ExternalLink, Network, Pencil, Plus, Trash2 } from "lucide-react";
 import { Notice } from "@/components/dashboard/notice";
 import { OfficialForm } from "@/components/dashboard/official-form";
@@ -18,10 +19,23 @@ import { cn } from "@/lib/utils";
 type FormState = null | "new" | DusunOfficial;
 
 export default function DashboardStrukturPage() {
+  return (
+    <Suspense fallback={null}>
+      <StrukturContent />
+    </Suspense>
+  );
+}
+
+function StrukturContent() {
   const { user } = useAuth();
   const all = useDusunOfficials();
-  const [picked, setPicked] = useState<string | null>(null);
-  const [form, setForm] = useState<FormState>(null);
+  // Tautan dari halaman RT: ?wilayah=rt01 memilih wilayah, ?jabatan=Sekretaris
+  // membuka form tambah dengan jabatan terisi, ?ketua=1 menandai kepala wilayah,
+  // ?edit=<id> langsung membuka jabatan yang sudah ada.
+  const params = useSearchParams();
+  const [picked, setPicked] = useState<string | null>(params.get("wilayah"));
+  // undefined = ikuti URL; null = form sengaja ditutup.
+  const [form, setForm] = useState<FormState | undefined>(undefined);
   const [error, setError] = useState("");
 
   // Wilayah yang boleh diisi akun ini: Dusun = semuanya, RW = RW-nya + RT di
@@ -38,6 +52,12 @@ export default function DashboardStrukturPage() {
   }
 
   const scope = scopes.find((s) => s.id === picked)?.id ?? scopes[0].id;
+  const editId = params.get("edit");
+  const defaultPosition = params.get("jabatan") ?? undefined;
+  const defaultHead = params.get("ketua") === "1";
+  const editTarget = editId ? officialsOf(all, scope).find((o) => o.id === editId) : undefined;
+  const fromUrl: FormState = editTarget ?? (defaultPosition || defaultHead ? "new" : null);
+  const shown = form === undefined ? fromUrl : form;
   const tiers = groupOfficialsByTier(officialsOf(all, scope));
   const lastTier = tiers[tiers.length - 1];
   const nextTier = lastTier ? lastTier.tier : 1;
@@ -115,11 +135,13 @@ export default function DashboardStrukturPage() {
         </p>
       )}
 
-      {form && (
+      {shown && (
         <OfficialForm
-          key={`${scope}-${form === "new" ? "new" : form.id}`}
+          key={`${scope}-${shown === "new" ? "new" : shown.id}`}
           ownerId={scope}
-          official={form === "new" ? undefined : form}
+          official={shown === "new" ? undefined : shown}
+          defaultPosition={defaultPosition}
+          defaultHead={defaultHead}
           defaultTier={nextTier}
           defaultOrder={nextOrder}
           onDone={() => setForm(null)}

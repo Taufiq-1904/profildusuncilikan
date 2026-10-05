@@ -2,11 +2,8 @@
 
 import { useState } from "react";
 import { X, Sparkles } from "lucide-react";
-import type { RTPotensi as Potensi } from "@/lib/data/potensiData";
-
-const KATEGORI_OPTIONS: Potensi["kategori"][] = [
-  "Pertanian", "Peternakan", "Kerajinan", "Pariwisata", "Perdagangan", "Lainnya",
-];
+import { ImageField } from "@/components/dashboard/image-field";
+import { POTENSI_KATEGORI, type RTPotensi as Potensi } from "@/lib/data/potensiData";
 
 const KATEGORI_COLORS: Record<Potensi["kategori"], string> = {
   Pertanian:   "#16a34a",
@@ -29,6 +26,7 @@ export function AddPotensiModal({ onAdd, onClose, initial }: Props) {
   const [judul, setJudul] = useState(initial?.judul ?? "");
   const [deskripsi, setDeskripsi] = useState(initial?.deskripsi ?? "");
   const [kategori, setKategori] = useState<Potensi["kategori"]>(initial?.kategori ?? "Pertanian");
+  const [foto, setFoto] = useState(initial?.foto);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -40,7 +38,7 @@ export function AddPotensiModal({ onAdd, onClose, initial }: Props) {
     setError("");
     setBusy(true);
     try {
-      await onAdd({ judul: judul.trim(), deskripsi: deskripsi.trim(), kategori });
+      await onAdd({ judul: judul.trim(), deskripsi: deskripsi.trim(), kategori, foto });
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Potensi gagal disimpan.");
@@ -53,7 +51,7 @@ export function AddPotensiModal({ onAdd, onClose, initial }: Props) {
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-ink-900/50 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl overflow-hidden">
+      <div className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-line px-6 py-4"
           style={{ background: "linear-gradient(135deg, #0e7490 0%, #0891b2 100%)" }}>
           <div className="flex items-center gap-2">
@@ -75,7 +73,7 @@ export function AddPotensiModal({ onAdd, onClose, initial }: Props) {
           <fieldset>
             <legend className={labelCls}>Kategori</legend>
             <div className="flex flex-wrap gap-2">
-              {KATEGORI_OPTIONS.map((k) => (
+              {POTENSI_KATEGORI.map((k) => (
                 <button
                   key={k} type="button" onClick={() => setKategori(k)} aria-pressed={kategori === k}
                   className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-all ${
@@ -98,6 +96,17 @@ export function AddPotensiModal({ onAdd, onClose, initial }: Props) {
               placeholder="Jelaskan potensi yang ada di RT ini, termasuk peluang pengembangan..."
               className={`${inputCls} resize-none`} />
           </div>
+
+          <ImageField
+            label="Foto potensi (opsional)"
+            value={foto}
+            onChange={setFoto}
+            onError={setError}
+            folder="potensi"
+            maxWidth={1000}
+            aspectClass="aspect-[4/3]"
+            hint="Foto diperkecil otomatis. Tanpa foto, kartu memakai gambar bawaan sesuai kategori."
+          />
 
           {error && <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
 

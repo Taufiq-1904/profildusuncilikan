@@ -18,6 +18,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         ? `${ringkas.slice(0, 157)}...`
         : ringkas || `${potensi.kategori} di ${getRTWithRWLabel(potensi.rtId)}.`,
     path: `/potensi/${potensi.id}`,
+    image: potensi.foto,
   });
 }
 

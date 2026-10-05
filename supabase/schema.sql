@@ -280,10 +280,14 @@ create table if not exists public.rt_potensi (
   judul      text not null,
   deskripsi  text not null default '',
   kategori   text not null default 'Lainnya',
+  foto       text,                         -- URL Supabase Storage (bucket media)
   created_by uuid references auth.users(id) default auth.uid(),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+-- Untuk database lama yang tabelnya sudah dibuat sebelum ada kolom foto.
+alter table public.rt_potensi add column if not exists foto text;
 
 alter table public.rt_potensi enable row level security;
 
