@@ -14,8 +14,8 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
     theme_color: "#0e4f5c",
     lang: "id",
     icons: [
-      // favicon.ico already covers the basic case; add PNG icons here once
-      // they exist (e.g. /icon-192.png, /icon-512.png) for a full PWA install prompt.
+      { src: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { src: "/icon-512.png", sizes: "512x512", type: "image/png" },
     ],
   };
 }
