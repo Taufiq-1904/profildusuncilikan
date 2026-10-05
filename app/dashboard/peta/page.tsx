@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Plus, Trash2 } from "lucide-react";
 import { errorClass } from "@/components/dashboard/form-styles";
@@ -13,6 +14,7 @@ import { getWilayahLabel } from "@/lib/data/wilayahData";
 import { usePins } from "@/lib/hooks/use-directory";
 import { pinToPlace } from "@/lib/mapPlaces";
 import { addPin, deletePin } from "@/lib/mapService";
+import { umkmFormHrefFromPin } from "@/lib/umkmPrefill";
 import { cn } from "@/lib/utils";
 
 export default function AdminPetaPage() {
@@ -131,6 +133,14 @@ export default function AdminPetaPage() {
                   {pin.kategori} · Oleh: {getWilayahLabel(pin.createdBy)}
                 </p>
               </div>
+              {pin.kategori === "UMKM" && canDelete(pin.id) && (
+                <Link
+                  href={umkmFormHrefFromPin(pin)}
+                  className="shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold text-brand-700 transition-colors hover:bg-brand-50"
+                >
+                  Pindahkan ke daftar UMKM
+                </Link>
+              )}
               {canDelete(pin.id) && (
                 <button
                   type="button"

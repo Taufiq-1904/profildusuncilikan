@@ -69,7 +69,8 @@ export async function addPin(input: PinInput): Promise<MapPin> {
   return rowToPin(data);
 }
 
-export async function deletePin(id: string): Promise<void> {
+// keepMedia: fotonya sudah dipakai data lain (mis. logo UMKM hasil pindahan).
+export async function deletePin(id: string, options: { keepMedia?: boolean } = {}): Promise<void> {
   const session = requireSession();
   const supabase = getSupabase();
 
@@ -87,7 +88,7 @@ export async function deletePin(id: string): Promise<void> {
   if (error) throw toUserError(error, "Lokasi gagal dihapus.");
   if (!data || data.length === 0) throw new Error("Lokasi gagal dihapus. Periksa hak akses Anda.");
 
-  await removeMedia([existing.foto]);
+  if (!options.keepMedia) await removeMedia([existing.foto]);
   await pinStore.refresh();
 }
 

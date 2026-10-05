@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/providers/auth-provider";
 import { getManageableWilayah } from "@/lib/auth";
 import { MAX_UMKM_GALLERY, umkmSuggestedCategories, type UMKM } from "@/lib/data/umkmData";
+import { deletePin } from "@/lib/mapService";
+import type { UmkmPrefill } from "@/lib/umkmPrefill";
 import { createUmkm, updateUmkm, type UmkmInput } from "@/lib/umkmService";
 import { cn, slugify } from "@/lib/utils";
 import {
@@ -19,7 +21,15 @@ import {
 import { GalleryField, ImageField } from "./image-field";
 import { LocationFields, parseCoordinate, type LocationValues } from "./location-fields";
 
-export function UmkmEditor({ umkm, defaultRtId }: { umkm?: UMKM; defaultRtId?: string }) {
+export function UmkmEditor({
+  umkm,
+  defaultRtId,
+  prefill,
+}: {
+  umkm?: UMKM;
+  defaultRtId?: string;
+  prefill?: UmkmPrefill;
+}) {
   const router = useRouter();
   const { user } = useAuth();
   // A business always belongs to an RT, so only RTs are offered here.
@@ -29,24 +39,24 @@ export function UmkmEditor({ umkm, defaultRtId }: { umkm?: UMKM; defaultRtId?: s
     (defaultRtId && rtOptions.some((r) => r.id === defaultRtId) ? defaultRtId : rtOptions[0]?.id) ??
     "";
 
-  const [nama, setNama] = useState(umkm?.nama ?? "");
+  const [nama, setNama] = useState(umkm?.nama ?? prefill?.nama ?? "");
   const [slug, setSlug] = useState(umkm?.slug ?? "");
   const [slugTouched, setSlugTouched] = useState(Boolean(umkm));
   const [jenis, setJenis] = useState(umkm?.jenis ?? umkmSuggestedCategories[0]);
   const [rtId, setRtId] = useState(initialRt);
-  const [deskripsi, setDeskripsi] = useState(umkm?.deskripsi ?? "");
+  const [deskripsi, setDeskripsi] = useState(umkm?.deskripsi ?? prefill?.deskripsi ?? "");
   const [produk, setProduk] = useState(umkm?.produk ?? "");
   const [pemilik, setPemilik] = useState(umkm?.pemilik ?? "");
   const [tampilkanPemilik, setTampilkanPemilik] = useState(umkm?.tampilkanPemilik ?? false);
-  const [kontak, setKontak] = useState(umkm?.kontak ?? "");
+  const [kontak, setKontak] = useState(umkm?.kontak ?? prefill?.kontak ?? "");
   const [jamOperasional, setJamOperasional] = useState(umkm?.jamOperasional ?? "");
   const [location, setLocation] = useState<LocationValues>({
-    alamat: umkm?.alamat ?? "",
-    mapsUrl: umkm?.mapsUrl ?? "",
-    lat: umkm?.lat?.toString() ?? "",
-    lng: umkm?.lng?.toString() ?? "",
+    alamat: umkm?.alamat ?? prefill?.alamat ?? "",
+    mapsUrl: umkm?.mapsUrl ?? prefill?.mapsUrl ?? "",
+    lat: umkm?.lat?.toString() ?? prefill?.lat ?? "",
+    lng: umkm?.lng?.toString() ?? prefill?.lng ?? "",
   });
-  const [logo, setLogo] = useState(umkm?.logo);
+  const [logo, setLogo] = useState(umkm?.logo ?? prefill?.logo);
   const [galeri, setGaleri] = useState<string[]>(umkm?.galeri ?? []);
   const [aktif, setAktif] = useState(umkm?.aktif ?? true);
   const [error, setError] = useState("");
@@ -86,6 +96,12 @@ export function UmkmEditor({ umkm, defaultRtId }: { umkm?: UMKM; defaultRtId?: s
     try {
       if (umkm) await updateUmkm(umkm.id, input);
       else await createUmkm(input);
+      if (!umkm && prefill?.dariPin) {
+        // Pinpoint lamanya sudah digantikan oleh UMKM ini. Fotonya dipakai
+        // sebagai logo, jadi file-nya tidak ikut dihapus. Gagal pun tidak
+        // masalah: peta menyembunyikan pinpoint UMKM yang berdekatan.
+        await deletePin(prefill.dariPin, { keepMedia: true }).catch(() => undefined);
+      }
       router.push("/dashboard/umkm");
     } catch (e) {
       setError(e instanceof Error ? e.message : "UMKM gagal disimpan.");
@@ -99,6 +115,13 @@ export function UmkmEditor({ umkm, defaultRtId }: { umkm?: UMKM; defaultRtId?: s
         <p className="text-sm font-medium uppercase tracking-wide text-ink-500">Dashboard</p>
         <h1 className="font-display text-2xl font-semibold text-ink-900">{umkm ? "Edit UMKM" : "UMKM Baru"}</h1>
       </div>
+
+      {!umkm && (prefill?.lat || prefill?.nama) && (
+        <p className="mb-6 rounded-xl border border-brand-100 bg-brand-50 px-4 py-3 text-sm text-brand-800">
+          Data dari pinpoint sudah terisi. Lengkapi kategori usaha dan produknya, lalu simpan agar UMKM ini
+          masuk ke daftar dan tetap tampil di peta.
+        </p>
+      )}
 
       {error && (
         <p role="alert" className={cn(errorClass, "mb-6")}>

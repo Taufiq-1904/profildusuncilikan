@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { X, MapPin } from "lucide-react";
 import { ImageField } from "@/components/dashboard/image-field";
 import { LocationPicker, type PickedLocation } from "@/components/dashboard/location-picker";
 import { PIN_CATEGORIES, type PinCategory } from "@/lib/data/mapData";
+import { umkmFormHref } from "@/lib/umkmPrefill";
 
 export type PinFormData = {
   nama: string;
@@ -22,11 +24,14 @@ export type PinFormData = {
 type Props = {
   lat?: number;
   lng?: number;
+  // RT pemilik bila modal dibuka dari halaman sebuah RT; dipakai untuk form UMKM.
+  rtId?: string;
   onAdd: (data: PinFormData) => void;
   onClose: () => void;
 };
 
-export function AddPinpointModal({ lat, lng, onAdd, onClose }: Props) {
+export function AddPinpointModal({ lat, lng, rtId, onAdd, onClose }: Props) {
+  const router = useRouter();
   const [nama, setNama] = useState("");
   const [deskripsi, setDeskripsi] = useState("");
   const [kategori, setKategori] = useState<PinCategory>("Fasilitas Umum");
@@ -42,6 +47,25 @@ export function AddPinpointModal({ lat, lng, onAdd, onClose }: Props) {
     if (!deskripsi.trim()) { setError("Deskripsi wajib diisi."); return; }
     if (location.lat === undefined || location.lng === undefined) {
       setError("Tandai lokasinya dulu: klik di peta atau tempel link Google Maps.");
+      return;
+    }
+
+    // UMKM tidak disimpan sebagai pinpoint biasa. Datanya dibawa ke form UMKM,
+    // sehingga usahanya masuk daftar UMKM dan muncul di peta dari satu sumber.
+    if (kategori === "UMKM") {
+      router.push(
+        umkmFormHref({
+          nama: nama.trim(),
+          deskripsi: deskripsi.trim(),
+          kontak,
+          alamat,
+          mapsUrl: location.mapsUrl,
+          lat: String(location.lat),
+          lng: String(location.lng),
+          logo: foto,
+          rtId,
+        })
+      );
       return;
     }
 
@@ -104,6 +128,13 @@ export function AddPinpointModal({ lat, lng, onAdd, onClose }: Props) {
             </select>
           </div>
 
+          {kategori === "UMKM" && (
+            <p className="rounded-xl border border-gold-400/40 bg-gold-100 px-3 py-2 text-xs leading-relaxed text-ink-700">
+              UMKM dikelola lewat daftar UMKM supaya tampil di halaman UMKM sekaligus di peta. Isi data di bawah
+              seperti biasa; setelah itu kamu diarahkan ke form UMKM untuk melengkapi kategori dan produknya.
+            </p>
+          )}
+
           <div>
             <label htmlFor="pin-deskripsi" className="mb-1.5 block text-sm font-medium text-ink-700">Deskripsi</label>
             <textarea
@@ -161,7 +192,7 @@ export function AddPinpointModal({ lat, lng, onAdd, onClose }: Props) {
               className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 transition-colors"
             >
               <MapPin className="h-4 w-4" />
-              Simpan Lokasi
+              {kategori === "UMKM" ? "Lanjut ke Form UMKM" : "Simpan Lokasi"}
             </button>
           </div>
         </form>
